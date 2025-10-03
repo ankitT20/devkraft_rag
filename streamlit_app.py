@@ -257,7 +257,7 @@ def main():
                                 json={"text": content}
                             )
                             if tts_response.status_code == 200:
-                                st.audio(tts_response.content, format="audio/wav")
+                                st.audio(tts_response.content, format="audio/wav", autoplay=True)
                             else:
                                 st.error("Failed to generate audio")
                         except Exception as e:
@@ -306,7 +306,7 @@ def main():
                                     json={"text": result["response"]}
                                 )
                                 if tts_response.status_code == 200:
-                                    st.audio(tts_response.content, format="audio/wav")
+                                    st.audio(tts_response.content, format="audio/wav", autoplay=True)
                                 else:
                                     st.error("Failed to generate audio")
                             except Exception as e:

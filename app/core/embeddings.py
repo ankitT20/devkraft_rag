@@ -2,6 +2,7 @@
 Embedding services for generating embeddings using Gemini and Local/HF models.
 """
 import os
+import time
 import numpy as np
 from typing import List, Optional
 from google import genai
@@ -23,11 +24,13 @@ class GeminiEmbedding:
         """Initialize Gemini client."""
         self.client = genai.Client(api_key=settings.gemini_api_key)
         self.model = settings.gemini_embedding_model
+        self.api_call_count = 0  # Track API calls for rate limiting
         app_logger.info(f"Initialized GeminiEmbedding with model: {self.model}")
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for documents using RETRIEVAL_DOCUMENT task type.
+        Implements rate limiting: 10 second delay after every 50 API calls.
         
         Args:
             texts: List of text strings to embed
@@ -37,6 +40,13 @@ class GeminiEmbedding:
         """
         try:
             app_logger.info(f"Generating Gemini embeddings for {len(texts)} documents")
+            
+            # Check if we need to apply rate limiting
+            self.api_call_count += 1
+            if self.api_call_count % 50 == 0:
+                app_logger.info(f"Rate limiting: Applied 10 second delay after {self.api_call_count} API calls")
+                time.sleep(10)
+            
             result = self.client.models.embed_content(
                 model=self.model,
                 contents=texts,
@@ -54,6 +64,7 @@ class GeminiEmbedding:
     def embed_query(self, text: str) -> List[float]:
         """
         Generate embedding for a query using RETRIEVAL_QUERY task type.
+        Implements rate limiting: 10 second delay after every 50 API calls.
         
         Args:
             text: Query text to embed
@@ -63,6 +74,13 @@ class GeminiEmbedding:
         """
         try:
             app_logger.info(f"Generating Gemini query embedding")
+            
+            # Check if we need to apply rate limiting
+            self.api_call_count += 1
+            if self.api_call_count % 50 == 0:
+                app_logger.info(f"Rate limiting: Applied 10 second delay after {self.api_call_count} API calls")
+                time.sleep(10)
+            
             result = self.client.models.embed_content(
                 model=self.model,
                 contents=text,
