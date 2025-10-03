@@ -213,6 +213,4 @@ After processing, files are moved to:
 - `generate_embeddings/stored_in_q_cloud_only/` - Cloud only
 - `generate_embeddings/stored_in_q_docker_only/` - Docker only
 
-## License
-
-MIT License
+### Make By Ankit Tayal
