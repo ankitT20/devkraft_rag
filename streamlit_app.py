@@ -195,7 +195,7 @@ def main():
             st.rerun()
     
     # Main chat interface
-    st.title(f"Current Model: {st.session_state.model_type.upper()}")
+    st.title(f"Welcome to Devkraft RAG - Current Model: {st.session_state.model_type.upper()}")
     
     # Display chat messages
     for i, message in enumerate(st.session_state.messages):
