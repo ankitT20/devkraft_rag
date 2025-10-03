@@ -128,6 +128,20 @@ Choose between two models in the sidebar dropdown:
 - `GET /chats` - Get recent chat sessions
 - `GET /chat/{chat_id}` - Get full chat history
 
+### API Demo Script
+
+Run the included demo script to see the API in action:
+
+```bash
+python demo.py
+```
+
+This will demonstrate:
+- Health checks
+- Document upload
+- RAG queries with both models
+- Chat history retrieval
+
 ## Configuration
 
 Edit `app/config.py` to customize:
