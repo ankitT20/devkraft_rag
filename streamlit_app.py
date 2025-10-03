@@ -216,6 +216,22 @@ def main():
                 
                 with st.expander("🧠 Show Thinking", expanded=False):
                     st.text(message["thinking"])
+            
+            # Add Listen button for assistant messages
+            if role == "assistant":
+                if st.button("🔊 Listen", key=f"listen_{i}"):
+                    with st.spinner("Generating audio..."):
+                        try:
+                            tts_response = requests.post(
+                                f"{API_URL}/tts",
+                                json={"text": content}
+                            )
+                            if tts_response.status_code == 200:
+                                st.audio(tts_response.content, format="audio/wav")
+                            else:
+                                st.error("Failed to generate audio")
+                        except Exception as e:
+                            st.error(f"Audio generation error: {e}")
     
     # Chat input
     if prompt := st.chat_input("Ask a question..."):
@@ -250,6 +266,21 @@ def main():
                     if result.get("thinking") and st.session_state.model_type == "qwen3":
                         with st.expander("🧠 Show Thinking", expanded=False):
                             st.text(result["thinking"])
+                    
+                    # Add Listen button
+                    if st.button("🔊 Listen", key=f"listen_new"):
+                        with st.spinner("Generating audio..."):
+                            try:
+                                tts_response = requests.post(
+                                    f"{API_URL}/tts",
+                                    json={"text": result["response"]}
+                                )
+                                if tts_response.status_code == 200:
+                                    st.audio(tts_response.content, format="audio/wav")
+                                else:
+                                    st.error("Failed to generate audio")
+                            except Exception as e:
+                                st.error(f"Audio generation error: {e}")
                     
                     # Add assistant message to chat
                     st.session_state.messages.append({
