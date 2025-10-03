@@ -64,8 +64,6 @@ def init_session_state():
         st.session_state.model_type = "gemini"
     if "show_thinking" not in st.session_state:
         st.session_state.show_thinking = {}
-    if "is_processing" not in st.session_state:
-        st.session_state.is_processing = False
 
 
 def load_chat_history(chat_id: str):
@@ -251,37 +249,22 @@ def main():
             
             # Add Listen button for assistant messages
             if role == "assistant":
-                # Generate audio on-demand when button is clicked
-                audio_key = f"audio_{i}"
-                if audio_key not in st.session_state:
-                    st.session_state[audio_key] = None
-                
-                col1, col2 = st.columns([1, 5])
-                with col1:
-                    if st.button("🔊 Listen", key=f"listen_btn_{i}"):
-                        with st.spinner("Generating audio..."):
-                            try:
-                                tts_response = requests.post(
-                                    f"{API_URL}/tts",
-                                    json={"text": content}
-                                )
-                                if tts_response.status_code == 200:
-                                    st.session_state[audio_key] = tts_response.content
-                                else:
-                                    st.error("Failed to generate audio")
-                            except Exception as e:
-                                st.error(f"Audio generation error: {e}")
-                
-                # Display audio if it's been generated
-                if st.session_state[audio_key] is not None:
-                    st.audio(st.session_state[audio_key], format="audio/wav", autoplay=True)
+                if st.button("🔊 Listen", key=f"listen_{i}"):
+                    with st.spinner("Generating audio..."):
+                        try:
+                            tts_response = requests.post(
+                                f"{API_URL}/tts",
+                                json={"text": content}
+                            )
+                            if tts_response.status_code == 200:
+                                st.audio(tts_response.content, format="audio/wav", autoplay=True)
+                            else:
+                                st.error("Failed to generate audio")
+                        except Exception as e:
+                            st.error(f"Audio generation error: {e}")
     
-    # Chat input - disable when processing
-    chat_disabled = st.session_state.is_processing
-    if prompt := st.chat_input("Ask a question...", disabled=chat_disabled):
-        # Set processing flag
-        st.session_state.is_processing = True
-        
+    # Chat input
+    if prompt := st.chat_input("Ask a question..."):
         # Add user message to chat
         st.session_state.messages.append({
             "role": "user",
@@ -314,19 +297,20 @@ def main():
                         with st.expander("🧠 Show Thinking", expanded=False):
                             st.text(result["thinking"])
                     
-                    # Generate audio automatically for new response
-                    with st.spinner("Generating audio..."):
-                        try:
-                            tts_response = requests.post(
-                                f"{API_URL}/tts",
-                                json={"text": result["response"]}
-                            )
-                            if tts_response.status_code == 200:
-                                st.audio(tts_response.content, format="audio/wav", autoplay=True)
-                            else:
-                                st.warning("Could not generate audio")
-                        except Exception as e:
-                            st.warning(f"Audio generation error: {e}")
+                    # Add Listen button
+                    if st.button("🔊 Listen", key=f"listen_new"):
+                        with st.spinner("Generating audio..."):
+                            try:
+                                tts_response = requests.post(
+                                    f"{API_URL}/tts",
+                                    json={"text": result["response"]}
+                                )
+                                if tts_response.status_code == 200:
+                                    st.audio(tts_response.content, format="audio/wav", autoplay=True)
+                                else:
+                                    st.error("Failed to generate audio")
+                            except Exception as e:
+                                st.error(f"Audio generation error: {e}")
                     
                     # Add assistant message to chat
                     st.session_state.messages.append({
@@ -337,9 +321,6 @@ def main():
                     })
                 else:
                     st.error("Failed to get response from API")
-                
-                # Reset processing flag
-                st.session_state.is_processing = False
 
 
 if __name__ == "__main__":
