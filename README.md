@@ -59,29 +59,56 @@ pip install -r requirements.txt
 
 ### 3. Optional: Start Qdrant Docker
 
+The application will automatically check for existing Qdrant Docker containers and resume them. If no containers exist, you can create one:
+
 ```bash
-docker run -p 6333:6333 qdrant/qdrant
+docker run -d -p 6333:6333 qdrant/qdrant
 ```
+
+The application will fall back to Qdrant Cloud if Docker is not available.
 
 ## Running the Application
 
-### Start FastAPI Backend
+### Quick Start (Recommended)
+
+Use the provided startup script to start both API and UI:
 
 ```bash
-cd /path/to/devkraft_rag
+./start.sh
+```
+
+This will:
+- Check for and resume existing Qdrant Docker containers (if any)
+- Start the FastAPI backend on port 8000
+- Start the Streamlit UI on port 8501
+- Create all necessary directories
+- Log output to `logs/` directory
+
+To stop the application:
+
+```bash
+./stop.sh
+```
+
+### Manual Start
+
+Alternatively, you can start services manually:
+
+**Terminal 1 - FastAPI Backend:**
+```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Start Streamlit UI
-
-In a separate terminal:
-
+**Terminal 2 - Streamlit UI:**
 ```bash
-cd /path/to/devkraft_rag
 streamlit run streamlit_app.py
 ```
 
-The UI will be available at http://localhost:8501
+### Access Points
+
+- **Streamlit UI**: http://localhost:8501
+- **FastAPI Backend**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
 
 ## Usage
 
@@ -128,35 +155,31 @@ Choose between two models in the sidebar dropdown:
 - `GET /chats` - Get recent chat sessions
 - `GET /chat/{chat_id}` - Get full chat history
 
-### API Demo Script
-
-Run the included demo script to see the API in action:
-
-```bash
-python demo.py
-```
-
-This will demonstrate:
-- Health checks
-- Document upload
-- RAG queries with both models
-- Chat history retrieval
+Visit http://localhost:8000/docs for interactive API documentation.
 
 ## Configuration
 
-Edit `app/config.py` to customize:
+All application settings are centralized in `app/config.py`. You can customize:
 
-- Chunk size and overlap
-- Model names
+- API keys and tokens (via environment variables or .env file)
+- Chunk size and overlap for document processing
+- Model names for embeddings and LLM
 - Qdrant URLs and collection names
-- File paths
+- File paths and directories
+- LM Studio configuration
+
+See `app/config.py` for all available settings.
 
 ## Logging
 
-Logs are stored in the `logs/` folder:
+All logs are stored in the `logs/` folder with automatic date-based naming:
 
-- `app_logs_YYYYMMDD.log` - All application logs
-- `errors_YYYYMMDD.log` - Error logs only
+- `app_logs_YYYYMMDD.log` - All application logs (INFO level and above)
+- `errors_YYYYMMDD.log` - Error logs only (ERROR level)
+- `uvicorn_YYYYMMDD_HHMMSS.log` - FastAPI/Uvicorn server logs
+- `streamlit_YYYYMMDD_HHMMSS.log` - Streamlit UI logs
+
+Logs include detailed timestamps, function names, and line numbers for debugging.
 
 ## Embedding Details
 
