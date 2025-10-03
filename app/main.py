@@ -18,7 +18,9 @@ from app.models.schemas import (
 )
 from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
+from app.core.tts import TTSService
 from app.utils.logging_config import app_logger, error_logger
+from fastapi.responses import Response
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -39,6 +41,7 @@ app.add_middleware(
 # Initialize services
 rag_service = RAGService()
 ingestion_service = IngestionService()
+tts_service = TTSService()
 
 app_logger.info("FastAPI application initialized")
 
@@ -202,6 +205,44 @@ async def get_chat(chat_id: str):
         
     except Exception as e:
         error_logger.error(f"Get chat endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tts")
+async def text_to_speech(request: dict):
+    """
+    Convert text to speech audio.
+    
+    Args:
+        request: Dictionary with 'text' field
+        
+    Returns:
+        Audio file as WAV
+    """
+    try:
+        text = request.get("text", "")
+        if not text:
+            raise HTTPException(status_code=400, detail="Text field is required")
+        
+        app_logger.info(f"TTS request for text: {text[:50]}...")
+        
+        audio_data = tts_service.text_to_speech(text)
+        
+        if audio_data:
+            return Response(
+                content=audio_data,
+                media_type="audio/wav",
+                headers={
+                    "Content-Disposition": "attachment; filename=speech.wav"
+                }
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate audio")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_logger.error(f"TTS endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

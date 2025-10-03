@@ -185,10 +185,10 @@ class LocalLLM:
         response.raise_for_status()
         
         result = response.json()["choices"][0]["message"]["content"]
-        thinking = self._extract_thinking(result)
+        cleaned_response, thinking = self._extract_thinking(result)
         
         app_logger.info("Successfully generated LM Studio response")
-        return result, thinking
+        return cleaned_response, thinking
     
     def _generate_with_hf(
         self, 
@@ -212,10 +212,10 @@ class LocalLLM:
         )
         
         result = completion.choices[0].message.content
-        thinking = self._extract_thinking(result)
+        cleaned_response, thinking = self._extract_thinking(result)
         
         app_logger.info("Successfully generated HuggingFace response")
-        return result, thinking
+        return cleaned_response, thinking
     
     def _build_prompt(self, query: str, context: str) -> str:
         """Build the RAG prompt."""
@@ -232,18 +232,20 @@ QUESTION: {query}
 ANSWER:"""
         return prompt
     
-    def _extract_thinking(self, response: str) -> Optional[str]:
+    def _extract_thinking(self, response: str) -> Tuple[str, Optional[str]]:
         """
-        Extract thinking block from response if present.
+        Extract thinking block from response if present and remove it from the response.
         
         Args:
             response: Full response text
             
         Returns:
-            Thinking text if found, None otherwise
+            Tuple of (cleaned_response, thinking_text)
         """
         if "<think>" in response and "</think>" in response:
-            start = response.find("<think>") + len("<think>")
-            end = response.find("</think>")
-            return response[start:end].strip()
-        return None
+            start = response.find("<think>")
+            end = response.find("</think>") + len("</think>")
+            thinking = response[start + len("<think>"):end - len("</think>")].strip()
+            cleaned_response = response[:start] + response[end:]
+            return cleaned_response.strip(), thinking
+        return response, None
