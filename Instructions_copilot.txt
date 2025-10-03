@@ -1,3 +1,15 @@
+@Copilot Always/Anytime refer Instructions_copilot.txt https://raw.githubusercontent.com/ankitT20/devkraft_rag/refs/heads/main/Instructions_copilot.txt for reference, even in middle of tasks if needed.
+
+@Copilot Confirm on top of Pull Request page
+You have access to:
+GEMINI_API_KEY
+HF_TOKEN
+QDRANT_API_KEY
+
+Also Confirm Keys are working. Exit if any of the keys are not working.
+
+----
+
 Instructions for copilot - check if you can access Gemini, Qdrant, huggingface API keys, make a simple request to confirm. stop if you can not access API.
 I know you do not have LM Studio API in this copilot environment, for your testing use huggingface API for both embedding and LLM model, add it as a fallback (that if 127.0.0.1:1234 is down, redirect to Hugging Face API)
 For testing/fallback of qdrant DB of docker, use qdrant cloud, just create a new collection with bootcamp_rag_docker vector size (768)), add this as a replication (save embeddings to both docker and qdrant cloud)
