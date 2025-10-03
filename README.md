@@ -77,17 +77,17 @@ Use the provided startup script to start both API and UI:
 ./start.sh
 ```
 
-This will:
+This will automatically:
 - Check for and resume existing Qdrant Docker containers (if any)
 - Start the FastAPI backend on port 8000
 - Start the Streamlit UI on port 8501
-- Create all necessary directories
-- Log output to `logs/` directory
+- Append logs to `logs/uvicorn_YYYYMMDD.log` and `logs/streamlit_YYYYMMDD.log`
 
 To stop the application:
 
 ```bash
-./stop.sh
+pkill -f uvicorn
+pkill -f streamlit
 ```
 
 ### Manual Start
@@ -176,10 +176,10 @@ All logs are stored in the `logs/` folder with automatic date-based naming:
 
 - `app_logs_YYYYMMDD.log` - All application logs (INFO level and above)
 - `errors_YYYYMMDD.log` - Error logs only (ERROR level)
-- `uvicorn_YYYYMMDD_HHMMSS.log` - FastAPI/Uvicorn server logs
-- `streamlit_YYYYMMDD_HHMMSS.log` - Streamlit UI logs
+- `uvicorn_YYYYMMDD.log` - FastAPI/Uvicorn server logs (appended daily)
+- `streamlit_YYYYMMDD.log` - Streamlit UI logs (appended daily)
 
-Logs include detailed timestamps, function names, and line numbers for debugging.
+Logs are appended when the application is restarted multiple times on the same day. Logs include detailed timestamps, function names, and line numbers for debugging.
 
 ## Embedding Details
 
