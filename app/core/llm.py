@@ -180,7 +180,7 @@ class LocalLLM:
                 "max_tokens": 1000,
                 "stream": False
             },
-            timeout=60
+            timeout=160
         )
         response.raise_for_status()
         
