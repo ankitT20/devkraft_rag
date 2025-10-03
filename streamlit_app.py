@@ -171,7 +171,7 @@ def main():
         with st.expander("ℹ️ Model Details"):
             st.markdown(MODEL_INFO[st.session_state.model_type]["details"])
         
-        st.divider()
+        st.markdown("---")
         
         # Document upload
         st.subheader("📄 Upload Document")
@@ -191,10 +191,15 @@ def main():
                         else:
                             st.error(f"❌ {result['message']}")
         
-        st.divider()
+        st.markdown("---")
         
         # Chat history
         st.subheader("💬 Recent Chats")
+        
+        if st.button("➕ New Chat", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.chat_id = None
+            st.rerun()
         
         if st.button("🔄 Refresh Chats"):
             st.rerun()
@@ -218,11 +223,6 @@ def main():
                     st.caption(f"💬 {chat['message_count']}")
         else:
             st.info("No recent chats")
-        
-        if st.button("➕ New Chat", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.chat_id = None
-            st.rerun()
     
     # Main chat interface
     st.title(f"Welcome to Devkraft RAG - Current Model: {st.session_state.model_type.upper()}")
