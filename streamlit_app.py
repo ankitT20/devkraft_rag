@@ -4,8 +4,17 @@ Simple chatbot interface with document upload and model selection.
 """
 import streamlit as st
 import requests
+import logging
 from pathlib import Path
 from datetime import datetime
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("streamlit_ui")
 
 # Configure page
 st.set_page_config(
@@ -14,6 +23,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+logger.info("Streamlit UI initialized")
 
 # API endpoint
 API_URL = "http://localhost:8000"
@@ -58,11 +69,15 @@ def init_session_state():
 def load_chat_history(chat_id: str):
     """Load chat history from API."""
     try:
+        logger.info(f"Loading chat history for chat_id: {chat_id}")
         response = requests.get(f"{API_URL}/chat/{chat_id}")
         if response.status_code == 200:
             chat_data = response.json()
-            return chat_data.get("messages", [])
+            messages = chat_data.get("messages", [])
+            logger.info(f"Loaded {len(messages)} messages for chat_id: {chat_id}")
+            return messages
     except Exception as e:
+        logger.error(f"Failed to load chat history for chat_id {chat_id}: {e}")
         st.error(f"Failed to load chat history: {e}")
     return []
 
@@ -70,10 +85,14 @@ def load_chat_history(chat_id: str):
 def get_recent_chats():
     """Get recent chat sessions from API."""
     try:
+        logger.info("Fetching recent chats from API")
         response = requests.get(f"{API_URL}/chats?limit=10")
         if response.status_code == 200:
-            return response.json()
+            chats = response.json()
+            logger.info(f"Retrieved {len(chats)} recent chats")
+            return chats
     except Exception as e:
+        logger.error(f"Failed to load recent chats: {e}")
         st.error(f"Failed to load recent chats: {e}")
     return []
 
@@ -81,6 +100,7 @@ def get_recent_chats():
 def send_query(query: str, model_type: str, chat_id: str = None):
     """Send query to API."""
     try:
+        logger.info(f"Sending query with model_type: {model_type}, chat_id: {chat_id}")
         payload = {
             "query": query,
             "model_type": model_type,
@@ -88,10 +108,14 @@ def send_query(query: str, model_type: str, chat_id: str = None):
         }
         response = requests.post(f"{API_URL}/query", json=payload)
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            logger.info(f"Query successful, received response for chat_id: {result.get('chat_id')}")
+            return result
         else:
+            logger.error(f"API error: {response.status_code}")
             st.error(f"API error: {response.status_code}")
     except Exception as e:
+        logger.error(f"Failed to send query: {e}")
         st.error(f"Failed to send query: {e}")
     return None
 
@@ -99,19 +123,25 @@ def send_query(query: str, model_type: str, chat_id: str = None):
 def upload_document(file):
     """Upload document to API."""
     try:
+        logger.info(f"Uploading document: {file.name} (type: {file.type})")
         files = {"file": (file.name, file, file.type)}
         response = requests.post(f"{API_URL}/upload", files=files)
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            logger.info(f"Document uploaded successfully: {file.name}")
+            return result
         else:
+            logger.error(f"Upload error: {response.status_code}")
             st.error(f"Upload error: {response.status_code}")
     except Exception as e:
+        logger.error(f"Failed to upload document {file.name}: {e}")
         st.error(f"Failed to upload document: {e}")
     return None
 
 
 def main():
     """Main Streamlit application."""
+    logger.info("Starting main Streamlit application")
     init_session_state()
     
     # Sidebar
@@ -141,7 +171,7 @@ def main():
         with st.expander("ℹ️ Model Details"):
             st.markdown(MODEL_INFO[st.session_state.model_type]["details"])
         
-        st.divider()
+        st.markdown("---")
         
         # Document upload
         st.subheader("📄 Upload Document")
@@ -161,10 +191,15 @@ def main():
                         else:
                             st.error(f"❌ {result['message']}")
         
-        st.divider()
+        st.markdown("---")
         
         # Chat history
         st.subheader("💬 Recent Chats")
+        
+        if st.button("➕ New Chat", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.chat_id = None
+            st.rerun()
         
         if st.button("🔄 Refresh Chats"):
             st.rerun()
@@ -188,11 +223,6 @@ def main():
                     st.caption(f"💬 {chat['message_count']}")
         else:
             st.info("No recent chats")
-        
-        if st.button("➕ New Chat", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.chat_id = None
-            st.rerun()
     
     # Main chat interface
     st.title(f"Welcome to Devkraft RAG - Current Model: {st.session_state.model_type.upper()}")
