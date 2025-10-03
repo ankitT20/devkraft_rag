@@ -1,0 +1,195 @@
+# DevKraft RAG Application
+
+A simple Retrieval-Augmented Generation (RAG) system with a Streamlit UI, FastAPI backend, and LangChain integration.
+
+## Features
+
+- 🤖 **Dual Model Support**: Choose between Gemini Cloud (gemini-2.5-flash) or Local LMStudio/HF (qwen3-1.7b)
+- 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD)
+- 💾 **Vector Storage**: Dual storage with Qdrant Cloud and Docker
+- 💬 **Chat History**: Persistent chat sessions with history management
+- 🧠 **Thinking Display**: View model reasoning process (qwen3)
+- 🔍 **RAG Pipeline**: Semantic search and context-aware responses
+
+## Project Structure
+
+```
+devkraft_rag/
+├── app/
+│   ├── core/              # Core functionality
+│   │   ├── embeddings.py  # Embedding services (Gemini, Local/HF)
+│   │   ├── llm.py         # LLM services (Gemini, Local/HF)
+│   │   └── storage.py     # Qdrant vector storage
+│   ├── services/          # Business logic
+│   │   ├── document_processor.py  # Document loading and chunking
+│   │   ├── ingestion.py   # Document ingestion pipeline
+│   │   └── rag.py         # RAG query processing
+│   ├── models/            # Pydantic schemas
+│   │   └── schemas.py
+│   ├── utils/             # Utilities
+│   │   └── logging_config.py
+│   ├── config.py          # Configuration
+│   └── main.py            # FastAPI application
+├── streamlit_app.py       # Streamlit UI
+├── generate_embeddings/   # Document upload folder
+├── user_chat/             # Chat history storage
+├── logs/                  # Application logs
+└── requirements.txt       # Dependencies
+```
+
+## Setup
+
+### 1. Environment Variables
+
+Set the following environment variables:
+
+```bash
+export GEMINI_API_KEY="your_gemini_api_key"
+export QDRANT_API_KEY="your_qdrant_api_key"
+export HF_TOKEN="your_huggingface_token"
+```
+
+Or create a `.env` file (see `.env.example`).
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Optional: Start Qdrant Docker
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+## Running the Application
+
+### Start FastAPI Backend
+
+```bash
+cd /path/to/devkraft_rag
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Start Streamlit UI
+
+In a separate terminal:
+
+```bash
+cd /path/to/devkraft_rag
+streamlit run streamlit_app.py
+```
+
+The UI will be available at http://localhost:8501
+
+## Usage
+
+### Model Selection
+
+Choose between two models in the sidebar dropdown:
+
+1. **Gemini Cloud** (Default):
+   - Embedding: gemini-embedding-001 (3072 dimensions)
+   - LLM: gemini-2.5-flash
+   - Storage: Qdrant Cloud
+
+2. **Qwen3 Local**:
+   - Embedding: embeddinggemma-300m (768 dimensions) with HF fallback
+   - LLM: qwen/qwen3-1.7b with HF fallback
+   - Storage: Qdrant Docker with Cloud replication
+
+### Upload Documents
+
+1. Click "Upload Document" in sidebar
+2. Select a file (TXT, PDF, DOCX, or MD)
+3. Click "Upload" button
+4. Document will be processed and stored in vector databases
+
+### Chat
+
+1. Type your question in the chat input
+2. Press Enter to send
+3. View the AI response
+4. For Qwen3 model, expand "Show Thinking" to see reasoning
+
+### Chat History
+
+- Recent chats appear in the sidebar
+- Click a chat to load it
+- Click "New Chat" to start fresh
+
+## API Endpoints
+
+- `GET /` - Health check
+- `POST /query` - Process RAG query
+- `POST /upload` - Upload and ingest document
+- `POST /ingest-all` - Ingest all documents in folder
+- `GET /chats` - Get recent chat sessions
+- `GET /chat/{chat_id}` - Get full chat history
+
+### API Demo Script
+
+Run the included demo script to see the API in action:
+
+```bash
+python demo.py
+```
+
+This will demonstrate:
+- Health checks
+- Document upload
+- RAG queries with both models
+- Chat history retrieval
+
+## Configuration
+
+Edit `app/config.py` to customize:
+
+- Chunk size and overlap
+- Model names
+- Qdrant URLs and collection names
+- File paths
+
+## Logging
+
+Logs are stored in the `logs/` folder:
+
+- `app_logs_YYYYMMDD.log` - All application logs
+- `errors_YYYYMMDD.log` - Error logs only
+
+## Embedding Details
+
+### Gemini (Cloud)
+- **Model**: gemini-embedding-001
+- **Dimensions**: 3072
+- **Normalization**: Pre-normalized by API
+- **Task Type**: RETRIEVAL_DOCUMENT for docs, RETRIEVAL_QUERY for queries
+
+### Local (LMStudio/HF)
+- **Model**: embeddinggemma-300m
+- **Dimensions**: 768
+- **Normalization**: Manual normalization required
+- **Fallback**: HuggingFace API if LMStudio unavailable
+
+## Document Processing
+
+- **Chunking**: Semantic chunking with LangChain
+- **Chunk Size**: 2000 characters
+- **Overlap**: 400 characters
+- **Supported Formats**: TXT, PDF, DOCX, MD
+
+## Storage Strategy
+
+Documents are processed and stored in both:
+1. **Qdrant Cloud** with Gemini embeddings (3072d)
+2. **Qdrant Docker** with Local embeddings (768d)
+
+After processing, files are moved to:
+- `generate_embeddings/stored/` - Both storages succeeded
+- `generate_embeddings/stored_in_q_cloud_only/` - Cloud only
+- `generate_embeddings/stored_in_q_docker_only/` - Docker only
+
+## License
+
+MIT License

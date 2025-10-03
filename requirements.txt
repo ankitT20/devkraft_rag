@@ -1,0 +1,30 @@
+# Core dependencies
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+streamlit==1.40.2
+python-multipart==0.0.20
+
+# AI/ML dependencies
+google-genai>=1.41.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-qdrant>=0.2.0
+qdrant-client>=1.12.0
+huggingface-hub>=0.27.0
+
+# Document processing
+pypdf==5.1.0
+python-docx==1.1.2
+python-magic==0.4.27
+
+# Data handling
+pydantic==2.10.3
+pydantic-settings==2.6.1
+numpy==2.2.1
+pandas==2.2.3
+
+# Utilities
+python-dotenv==1.0.1
+requests==2.32.3
+aiofiles==24.1.0
