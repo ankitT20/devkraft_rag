@@ -246,10 +246,14 @@ def main():
                         page_info = f"*Page {source['page']} of {source['source']}*"
                         st.markdown(page_info)
                         
-                        # Add expandable section for original source text
+                        # Add collapsible section for original source text using details/summary
                         if source.get('text'):
-                            with st.expander("▶ View original source text"):
-                                st.text(source['text'])
+                            st.markdown(f"""
+                            <details>
+                            <summary style="cursor: pointer; color: #0066cc;">▶ View original source text</summary>
+                            <pre style="white-space: pre-wrap; font-size: 0.8em; background-color: #f5f5f5; padding: 10px; border-radius: 5px;">{source['text']}</pre>
+                            </details>
+                            """, unsafe_allow_html=True)
                         
                         st.markdown("")  # Add spacing between sources
             
@@ -321,10 +325,14 @@ def main():
                                 page_info = f"*Page {source['page']} of {source['source']}*"
                                 st.markdown(page_info)
                                 
-                                # Add expandable section for original source text
+                                # Add collapsible section for original source text using details/summary
                                 if source.get('text'):
-                                    with st.expander("▶ View original source text"):
-                                        st.text(source['text'])
+                                    st.markdown(f"""
+                                    <details>
+                                    <summary style="cursor: pointer; color: #0066cc;">▶ View original source text</summary>
+                                    <pre style="white-space: pre-wrap; font-size: 0.8em; background-color: #f5f5f5; padding: 10px; border-radius: 5px;">{source['text']}</pre>
+                                    </details>
+                                    """, unsafe_allow_html=True)
                                 
                                 st.markdown("")  # Add spacing between sources
                     

@@ -10,22 +10,23 @@ from app.config import settings
 from app.utils.logging_config import app_logger, error_logger
 
 
-def generate_point_id(doc_hash: str) -> str:
+def generate_point_id(doc_hash: str, chunk_index: int = 0) -> str:
     """
-    Generate a unique point ID using MD5 hash + partial UUID1.
+    Generate a unique point ID by combining MD5 hash with chunk index.
+    Creates a deterministic UUID5 from the combination.
     
     Args:
         doc_hash: MD5 hash of the document
+        chunk_index: Index of the chunk in the document
         
     Returns:
-        Point ID in format: MD5_uuid1_partial (e.g., 3C7357B6D77D56845E5A610344A0382_0fbf8a9a)
+        UUID string that includes document hash and chunk index
     """
-    # Generate UUID1 (time-based UUID)
-    uuid1_full = uuid.uuid1()
-    # Get first part of UUID1 (before first hyphen)
-    uuid1_partial = str(uuid1_full).split('-')[0]
-    # Combine MD5 hash with partial UUID1
-    return f"{doc_hash}_{uuid1_partial}"
+    # Create a namespace UUID from the doc hash
+    namespace = uuid.UUID(int=int(doc_hash[:32], 16) % (2**128))
+    # Generate UUID5 using the namespace and chunk index
+    point_uuid = uuid.uuid5(namespace, str(chunk_index))
+    return str(point_uuid)
 
 
 class QdrantStorage:
@@ -130,9 +131,9 @@ class QdrantStorage:
             
             points = []
             for i, (embedding, text) in enumerate(zip(embeddings, texts)):
-                # Generate point ID using MD5_uuid1 format
+                # Generate point ID using doc_hash and chunk index
                 if doc_hash:
-                    point_id = generate_point_id(doc_hash)
+                    point_id = generate_point_id(doc_hash, i)
                 else:
                     point_id = str(uuid.uuid4())
                     
@@ -184,9 +185,9 @@ class QdrantStorage:
         # Prepare points
         points = []
         for i, (embedding, text) in enumerate(zip(embeddings, texts)):
-            # Generate point ID using MD5_uuid1 format
+            # Generate point ID using doc_hash and chunk index
             if doc_hash:
-                point_id = generate_point_id(doc_hash)
+                point_id = generate_point_id(doc_hash, i)
             else:
                 point_id = str(uuid.uuid4())
                 
