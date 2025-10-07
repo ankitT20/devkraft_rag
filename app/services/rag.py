@@ -62,11 +62,11 @@ class RAGService:
             # Generate query embedding and retrieve context
             if model_type == "gemini":
                 query_embedding = self.gemini_embedding.embed_query(user_query)
-                search_results = self.storage.search_cloud(query_embedding, limit=5)
+                search_results = self.storage.search_cloud(query_embedding, limit=4)
             else:  # qwen3
                 query_embedding = self.local_embedding.embed_query(user_query)
                 # search_docker handles fallback from localhost to cloud docker collection
-                search_results = self.storage.search_docker(query_embedding, limit=5)
+                search_results = self.storage.search_docker(query_embedding, limit=4)
             
             # Build context from search results
             context = self._build_context(search_results)

@@ -197,7 +197,7 @@ class QdrantStorage:
         
         return docker_success or cloud_success
     
-    def search_cloud(self, query_vector: List[float], limit: int = 5) -> List[Dict]:
+    def search_cloud(self, query_vector: List[float], limit: int = 4) -> List[Dict]:
         """
         Search for similar documents in cloud collection.
         
@@ -232,7 +232,7 @@ class QdrantStorage:
             error_logger.error(f"Failed to search cloud collection: {e}")
             raise
     
-    def search_docker(self, query_vector: List[float], limit: int = 5) -> List[Dict]:
+    def search_docker(self, query_vector: List[float], limit: int = 4) -> List[Dict]:
         """
         Search for similar documents in docker collection with cloud fallback.
         First tries Docker localhost, then falls back to cloud docker collection.
