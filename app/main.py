@@ -14,7 +14,8 @@ from app.models.schemas import (
     QueryResponse, 
     IngestionResponse, 
     ChatHistoryItem,
-    HealthResponse
+    HealthResponse,
+    SourceInfo
 )
 from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
@@ -73,12 +74,12 @@ async def query(request: QueryRequest):
         request: Query request with user query and model type
         
     Returns:
-        Generated response with optional thinking
+        Generated response with optional thinking and sources
     """
     try:
         app_logger.info(f"Received query request: model_type={request.model_type}")
         
-        response, thinking, chat_id = rag_service.query(
+        response, thinking, chat_id, sources = rag_service.query(
             user_query=request.query,
             model_type=request.model_type,
             chat_id=request.chat_id
@@ -87,7 +88,8 @@ async def query(request: QueryRequest):
         return QueryResponse(
             response=response,
             thinking=thinking,
-            chat_id=chat_id
+            chat_id=chat_id,
+            sources=sources
         )
         
     except Exception as e:

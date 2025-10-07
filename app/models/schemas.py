@@ -12,11 +12,21 @@ class QueryRequest(BaseModel):
     chat_id: Optional[str] = Field(None, description="Optional chat session ID")
 
 
+class SourceInfo(BaseModel):
+    """Model for source information."""
+    header: str = Field(..., description="Document header/title")
+    page: int = Field(..., description="Page number")
+    filename: str = Field(..., description="Source filename")
+    text: str = Field(..., description="Original source text")
+    chunkno: str = Field(..., description="Chunk number")
+
+
 class QueryResponse(BaseModel):
     """Response model for RAG query."""
     response: str = Field(..., description="Generated response")
     thinking: Optional[str] = Field(None, description="Thinking process (for qwen3)")
     chat_id: str = Field(..., description="Chat session ID")
+    sources: List[SourceInfo] = Field(default_factory=list, description="List of sources used")
 
 
 class IngestionResponse(BaseModel):

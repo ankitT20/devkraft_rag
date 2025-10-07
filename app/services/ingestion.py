@@ -54,12 +54,24 @@ class IngestionService:
         try:
             app_logger.info(f"Starting ingestion for: {file_path}")
             
-            # Load and chunk document
-            chunks = self.processor.load_document(file_path)
-            metadata = self.processor.get_document_metadata(file_path)
+            # Calculate MD5 hash for the document
+            md5_hash = self.processor.calculate_md5(file_path)
+            app_logger.info(f"Document MD5: {md5_hash}")
             
-            # Prepare metadata for each chunk
-            chunk_metadata = [metadata for _ in chunks]
+            # Load and chunk document with metadata
+            chunks, chunk_page_metadata = self.processor.load_document(file_path)
+            base_metadata = self.processor.get_document_metadata(file_path)
+            
+            # Prepare metadata for each chunk with page, header, and chunkno
+            chunk_metadata = []
+            for i, page_meta in enumerate(chunk_page_metadata):
+                chunk_meta = {
+                    **base_metadata,
+                    "page": page_meta["page"],
+                    "header": page_meta["header"],
+                    "chunkno": f"{i+1:05d}"  # Format as 00001, 00002, etc.
+                }
+                chunk_metadata.append(chunk_meta)
             
             # Generate embeddings and store
             cloud_success = False
@@ -72,7 +84,8 @@ class IngestionService:
                 cloud_success = self.storage.store_embeddings_cloud(
                     gemini_embeddings, 
                     chunks, 
-                    chunk_metadata
+                    chunk_metadata,
+                    md5_hash=md5_hash
                 )
             except Exception as e:
                 error_logger.error(f"Failed to store in cloud: {e}")
@@ -84,7 +97,8 @@ class IngestionService:
                 docker_success = self.storage.store_embeddings_docker(
                     local_embeddings, 
                     chunks, 
-                    chunk_metadata
+                    chunk_metadata,
+                    md5_hash=md5_hash
                 )
             except Exception as e:
                 error_logger.error(f"Failed to store in docker: {e}")
@@ -101,7 +115,7 @@ class IngestionService:
             elif docker_success:
                 msg = f"Successfully ingested to docker only"
             else:
-                msg = f"Failed to ingest to any database"
+                msg = f"Failed to ingest to any database (document may already exist)"
                 error_logger.error(msg)
                 return False, msg
             
