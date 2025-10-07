@@ -257,12 +257,14 @@ def main():
                     for idx, source in enumerate(sources, 1):
                         st.markdown(f"**{idx}. {source['header']}**")
                         st.caption(f"*Page {source['page']} of {source['filename']}*")
-                        # Use checkbox to toggle source text display
-                        show_text_key = f"show_source_{i}_{idx}"
-                        if st.checkbox(f"▶ View original source text", key=show_text_key):
-                            st.text(source['text'])
-                        if idx < len(sources):
-                            st.markdown("---")
+                        # Add collapsible section for original source text using details/summary
+                        if source.get('text'):
+                            st.markdown(f"""
+                            <details>
+                            <summary>▶ View original source text</summary>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
+                            </details>
+                            """, unsafe_allow_html=True)
             
             # Add Listen button for assistant messages
             if role == "assistant":
@@ -321,12 +323,14 @@ def main():
                             for idx, source in enumerate(sources, 1):
                                 st.markdown(f"**{idx}. {source['header']}**")
                                 st.caption(f"*Page {source['page']} of {source['filename']}*")
-                                # Use checkbox to toggle source text display
-                                show_text_key = f"show_source_new_{idx}"
-                                if st.checkbox(f"▶ View original source text", key=show_text_key):
-                                    st.text(source['text'])
-                                if idx < len(sources):
-                                    st.markdown("---")
+                                # Add collapsible section for original source text using details/summary
+                                if source.get('text'):
+                                    st.markdown(f"""
+                                    <details>
+                                    <summary>▶ View original source text</summary>
+                                    <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
+                                    </details>
+                                    """, unsafe_allow_html=True)
                     
                     # Add Listen button
                     if st.button("🔊 Listen", key=f"listen_new"):

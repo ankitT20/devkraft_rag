@@ -83,6 +83,9 @@ class GeminiLLM:
             # Extract sources from response
             sources = self._extract_source_indices(result)
             
+            # Remove the SOURCES line from the result
+            result = self._remove_sources_line(result)
+            
             app_logger.info(f"Successfully generated Gemini response with sources: {sources}")
             return result, sources
             
@@ -117,7 +120,7 @@ CONTEXT: {context}
 
 QUESTION: {query}
 
-ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by the document numbers you used, comma-separated, in order of relevance)"""
+ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by ONLY the document numbers you actually used in your answer, comma-separated, in order of relevance. If you did not use any documents or they were not relevant, write "SOURCES: 0")"""
         return prompt
     
     def _extract_source_indices(self, response: str) -> List[int]:
@@ -129,11 +132,18 @@ ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed 
         match = re.search(r'SOURCES:\s*([0-9,\s]+)', response, re.IGNORECASE)
         if match:
             source_str = match.group(1)
-            # Extract all numbers
+            # Extract all numbers (ignore 0 which means no sources used)
             numbers = re.findall(r'\d+', source_str)
             sources = [int(n) for n in numbers if 1 <= int(n) <= 4]
         
         return sources
+    
+    def _remove_sources_line(self, response: str) -> str:
+        """Remove the SOURCES line from the response."""
+        import re
+        # Remove the entire SOURCES line
+        cleaned = re.sub(r'\n*SOURCES:\s*[0-9,\s]+\s*$', '', response, flags=re.IGNORECASE)
+        return cleaned.strip()
 
 
 class LocalLLM:
@@ -256,6 +266,7 @@ class LocalLLM:
         result = response.json()["choices"][0]["message"]["content"]
         cleaned_response, thinking = self._extract_thinking(result)
         sources = self._extract_source_indices(cleaned_response)
+        cleaned_response = self._remove_sources_line(cleaned_response)
         
         app_logger.info("Successfully generated LM Studio response")
         return cleaned_response, thinking, sources
@@ -284,6 +295,7 @@ class LocalLLM:
         result = completion.choices[0].message.content
         cleaned_response, thinking = self._extract_thinking(result)
         sources = self._extract_source_indices(cleaned_response)
+        cleaned_response = self._remove_sources_line(cleaned_response)
         
         app_logger.info("Successfully generated HuggingFace response")
         return cleaned_response, thinking, sources
@@ -315,7 +327,7 @@ CONTEXT: {context}
 
 QUESTION: {query}
 
-ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by the document numbers you used, comma-separated, in order of relevance)"""
+ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by ONLY the document numbers you actually used in your answer, comma-separated, in order of relevance. If you did not use any documents or they were not relevant, write "SOURCES: 0")"""
         return prompt
     
     def _extract_source_indices(self, response: str) -> List[int]:
@@ -327,11 +339,18 @@ ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed 
         match = re.search(r'SOURCES:\s*([0-9,\s]+)', response, re.IGNORECASE)
         if match:
             source_str = match.group(1)
-            # Extract all numbers
+            # Extract all numbers (ignore 0 which means no sources used)
             numbers = re.findall(r'\d+', source_str)
             sources = [int(n) for n in numbers if 1 <= int(n) <= 4]
         
         return sources
+    
+    def _remove_sources_line(self, response: str) -> str:
+        """Remove the SOURCES line from the response."""
+        import re
+        # Remove the entire SOURCES line
+        cleaned = re.sub(r'\n*SOURCES:\s*[0-9,\s]+\s*$', '', response, flags=re.IGNORECASE)
+        return cleaned.strip()
     
     def _extract_thinking(self, response: str) -> Tuple[str, Optional[str]]:
         """
