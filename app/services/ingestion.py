@@ -54,8 +54,8 @@ class IngestionService:
         try:
             app_logger.info(f"Starting ingestion for: {file_path}")
             
-            # Load and chunk document (now returns chunks with per-chunk metadata)
-            chunks, chunk_specific_metadata = self.processor.load_document(file_path)
+            # Load and chunk document (now returns chunks with per-chunk metadata and doc hash)
+            chunks, chunk_specific_metadata, doc_hash = self.processor.load_document(file_path)
             
             # Get document-level metadata
             doc_metadata = self.processor.get_document_metadata(file_path)
@@ -77,7 +77,8 @@ class IngestionService:
                 cloud_success = self.storage.store_embeddings_cloud(
                     gemini_embeddings, 
                     chunks, 
-                    chunk_metadata
+                    chunk_metadata,
+                    doc_hash
                 )
             except Exception as e:
                 error_logger.error(f"Failed to store in cloud: {e}")
@@ -89,7 +90,8 @@ class IngestionService:
                 docker_success = self.storage.store_embeddings_docker(
                     local_embeddings, 
                     chunks, 
-                    chunk_metadata
+                    chunk_metadata,
+                    doc_hash
                 )
             except Exception as e:
                 error_logger.error(f"Failed to store in docker: {e}")

@@ -10,6 +10,24 @@ from app.config import settings
 from app.utils.logging_config import app_logger, error_logger
 
 
+def generate_point_id(doc_hash: str) -> str:
+    """
+    Generate a unique point ID using MD5 hash + partial UUID1.
+    
+    Args:
+        doc_hash: MD5 hash of the document
+        
+    Returns:
+        Point ID in format: MD5_uuid1_partial (e.g., 3C7357B6D77D56845E5A610344A0382_0fbf8a9a)
+    """
+    # Generate UUID1 (time-based UUID)
+    uuid1_full = uuid.uuid1()
+    # Get first part of UUID1 (before first hyphen)
+    uuid1_partial = str(uuid1_full).split('-')[0]
+    # Combine MD5 hash with partial UUID1
+    return f"{doc_hash}_{uuid1_partial}"
+
+
 class QdrantStorage:
     """
     Qdrant storage service managing both cloud and docker collections.
@@ -92,7 +110,8 @@ class QdrantStorage:
         self, 
         embeddings: List[List[float]], 
         texts: List[str], 
-        metadata: List[Dict] = None
+        metadata: List[Dict] = None,
+        doc_hash: str = None
     ) -> bool:
         """
         Store embeddings in Qdrant Cloud collection.
@@ -101,6 +120,7 @@ class QdrantStorage:
             embeddings: List of embedding vectors
             texts: List of original texts
             metadata: Optional metadata for each text
+            doc_hash: MD5 hash of the document for point ID generation
             
         Returns:
             True if successful, False otherwise
@@ -110,7 +130,12 @@ class QdrantStorage:
             
             points = []
             for i, (embedding, text) in enumerate(zip(embeddings, texts)):
-                point_id = str(uuid.uuid4())
+                # Generate point ID using MD5_uuid1 format
+                if doc_hash:
+                    point_id = generate_point_id(doc_hash)
+                else:
+                    point_id = str(uuid.uuid4())
+                    
                 payload = {
                     "text": text,
                     "metadata": metadata[i] if metadata else {}
@@ -137,7 +162,8 @@ class QdrantStorage:
         self, 
         embeddings: List[List[float]], 
         texts: List[str], 
-        metadata: List[Dict] = None
+        metadata: List[Dict] = None,
+        doc_hash: str = None
     ) -> bool:
         """
         Store embeddings in Qdrant Docker collection with cloud replication.
@@ -147,6 +173,7 @@ class QdrantStorage:
             embeddings: List of embedding vectors
             texts: List of original texts
             metadata: Optional metadata for each text
+            doc_hash: MD5 hash of the document for point ID generation
             
         Returns:
             True if at least one storage succeeded, False otherwise
@@ -157,7 +184,12 @@ class QdrantStorage:
         # Prepare points
         points = []
         for i, (embedding, text) in enumerate(zip(embeddings, texts)):
-            point_id = str(uuid.uuid4())
+            # Generate point ID using MD5_uuid1 format
+            if doc_hash:
+                point_id = generate_point_id(doc_hash)
+            else:
+                point_id = str(uuid.uuid4())
+                
             payload = {
                 "text": text,
                 "metadata": metadata[i] if metadata else {}
@@ -222,7 +254,8 @@ class QdrantStorage:
                 search_results.append({
                     "text": result.payload["text"],
                     "metadata": result.payload.get("metadata", {}),
-                    "score": result.score
+                    "score": result.score,
+                    "point_id": result.id
                 })
             
             app_logger.info(f"Found {len(search_results)} results in cloud collection")
@@ -260,7 +293,8 @@ class QdrantStorage:
                     search_results.append({
                         "text": result.payload["text"],
                         "metadata": result.payload.get("metadata", {}),
-                        "score": result.score
+                        "score": result.score,
+                        "point_id": result.id
                     })
                 
                 app_logger.info(f"Found {len(search_results)} results in docker collection (localhost)")
@@ -286,7 +320,8 @@ class QdrantStorage:
                 search_results.append({
                     "text": result.payload["text"],
                     "metadata": result.payload.get("metadata", {}),
-                    "score": result.score
+                    "score": result.score,
+                    "point_id": result.id
                 })
             
             app_logger.info(f"Found {len(search_results)} results in cloud docker collection")

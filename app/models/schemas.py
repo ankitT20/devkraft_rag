@@ -18,7 +18,10 @@ class SourceInfo(BaseModel):
     title: str = Field(..., description="Title or header from the source")
     source: str = Field(..., description="Source filename")
     page: Any = Field(..., description="Page number or N/A")
+    chunkno: str = Field(default="N/A", description="Chunk number")
     score: float = Field(..., description="Relevance score")
+    text: str = Field(default="", description="Original chunk text")
+    point_id: str = Field(default="", description="Qdrant point ID")
 
 
 class QueryResponse(BaseModel):

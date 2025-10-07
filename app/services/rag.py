@@ -148,7 +148,10 @@ class RAGService:
                 'title': metadata.get('header', 'N/A'),
                 'source': metadata.get('filename', 'Unknown'),
                 'page': metadata.get('page', 'N/A'),
-                'score': round(result.get('score', 0), 3)
+                'chunkno': metadata.get('chunkno', 'N/A'),
+                'score': round(result.get('score', 0), 3),
+                'text': result.get('text', ''),  # Include the original chunk text
+                'point_id': result.get('point_id', '')
             }
             sources.append(source_info)
         

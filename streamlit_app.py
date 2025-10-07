@@ -239,12 +239,19 @@ def main():
             if role == "assistant" and message.get("sources"):
                 with st.expander("📚 Show Sources", expanded=False):
                     for source in message["sources"]:
-                        st.markdown(f"**Source {source['index']}:**")
-                        st.markdown(f"- **Title/Header:** {source['title']}")
-                        st.markdown(f"- **Source:** {source['source']}")
-                        st.markdown(f"- **Page:** {source['page']}")
-                        st.markdown(f"- **Relevance Score:** {source['score']}")
-                        st.markdown("---")
+                        # Display title/header
+                        st.markdown(f"**• {source['title']}**")
+                        
+                        # Display page and source in italics (smaller text)
+                        page_info = f"*Page {source['page']} of {source['source']}*"
+                        st.markdown(page_info)
+                        
+                        # Add expandable section for original source text
+                        if source.get('text'):
+                            with st.expander("▶ View original source text"):
+                                st.text(source['text'])
+                        
+                        st.markdown("")  # Add spacing between sources
             
             # Show thinking box for assistant messages in qwen3 mode
             if (role == "assistant" and 
@@ -307,12 +314,19 @@ def main():
                     if result.get("sources"):
                         with st.expander("📚 Show Sources", expanded=False):
                             for source in result["sources"]:
-                                st.markdown(f"**Source {source['index']}:**")
-                                st.markdown(f"- **Title/Header:** {source['title']}")
-                                st.markdown(f"- **Source:** {source['source']}")
-                                st.markdown(f"- **Page:** {source['page']}")
-                                st.markdown(f"- **Relevance Score:** {source['score']}")
-                                st.markdown("---")
+                                # Display title/header
+                                st.markdown(f"**• {source['title']}**")
+                                
+                                # Display page and source in italics (smaller text)
+                                page_info = f"*Page {source['page']} of {source['source']}*"
+                                st.markdown(page_info)
+                                
+                                # Add expandable section for original source text
+                                if source.get('text'):
+                                    with st.expander("▶ View original source text"):
+                                        st.text(source['text'])
+                                
+                                st.markdown("")  # Add spacing between sources
                     
                     # Show thinking for qwen3
                     if result.get("thinking") and st.session_state.model_type == "qwen3":

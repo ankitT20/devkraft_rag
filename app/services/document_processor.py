@@ -34,7 +34,7 @@ class DocumentProcessor:
             f"chunk_overlap={settings.chunk_overlap}"
         )
     
-    def load_document(self, file_path: str) -> Tuple[List[str], List[Dict]]:
+    def load_document(self, file_path: str) -> Tuple[List[str], List[Dict], str]:
         """
         Load and chunk a document based on its file type.
         
@@ -42,7 +42,7 @@ class DocumentProcessor:
             file_path: Path to the document file
             
         Returns:
-            Tuple of (List of text chunks, List of metadata dicts for each chunk)
+            Tuple of (List of text chunks, List of metadata dicts for each chunk, document hash)
         """
         try:
             app_logger.info(f"Loading document: {file_path}")
@@ -65,10 +65,16 @@ class DocumentProcessor:
             # Load documents
             documents = loader.load()
             
+            # Calculate document hash (MD5)
+            import hashlib
+            file_name = Path(file_path).name
+            doc_hash = hashlib.md5(file_name.encode()).hexdigest().upper()
+            
             # For PDFs, we want to preserve page information
             # Split into chunks while preserving metadata
             chunks = []
             chunk_metadata = []
+            chunk_number = 1
             
             for doc in documents:
                 # Extract page number from metadata if available
@@ -85,19 +91,20 @@ class DocumentProcessor:
                 
                 for chunk in doc_chunks:
                     chunks.append(chunk)
-                    # Store metadata for each chunk
+                    # Store metadata for each chunk with 5-digit chunk number
                     chunk_meta = {
                         'page': page_num,
                         'header': header.strip(),
-                        'source': doc.metadata.get('source', file_path)
+                        'chunkno': f"{chunk_number:05d}"  # 5-digit format like 00001
                     }
                     chunk_metadata.append(chunk_meta)
+                    chunk_number += 1
             
             app_logger.info(
                 f"Successfully loaded and chunked document: {file_path} "
-                f"into {len(chunks)} chunks"
+                f"into {len(chunks)} chunks with hash {doc_hash}"
             )
-            return chunks, chunk_metadata
+            return chunks, chunk_metadata, doc_hash
             
         except Exception as e:
             error_logger.error(f"Failed to load document {file_path}: {e}")
@@ -115,8 +122,5 @@ class DocumentProcessor:
         """
         path = Path(file_path)
         return {
-            "filename": path.name,
-            "file_type": path.suffix,
-            "file_size": path.stat().st_size,
-            "file_path": str(path)
+            "filename": path.name
         }
