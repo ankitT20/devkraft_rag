@@ -1,7 +1,7 @@
 """
 Pydantic schemas for request/response validation.
 """
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -12,11 +12,21 @@ class QueryRequest(BaseModel):
     chat_id: Optional[str] = Field(None, description="Optional chat session ID")
 
 
+class SourceInfo(BaseModel):
+    """Model for source information."""
+    index: int = Field(..., description="Source index")
+    title: str = Field(..., description="Title or header from the source")
+    source: str = Field(..., description="Source filename")
+    page: Any = Field(..., description="Page number or N/A")
+    score: float = Field(..., description="Relevance score")
+
+
 class QueryResponse(BaseModel):
     """Response model for RAG query."""
     response: str = Field(..., description="Generated response")
     thinking: Optional[str] = Field(None, description="Thinking process (for qwen3)")
     chat_id: str = Field(..., description="Chat session ID")
+    sources: List[SourceInfo] = Field(default_factory=list, description="Sources used in response")
 
 
 class IngestionResponse(BaseModel):

@@ -54,12 +54,17 @@ class IngestionService:
         try:
             app_logger.info(f"Starting ingestion for: {file_path}")
             
-            # Load and chunk document
-            chunks = self.processor.load_document(file_path)
-            metadata = self.processor.get_document_metadata(file_path)
+            # Load and chunk document (now returns chunks with per-chunk metadata)
+            chunks, chunk_specific_metadata = self.processor.load_document(file_path)
             
-            # Prepare metadata for each chunk
-            chunk_metadata = [metadata for _ in chunks]
+            # Get document-level metadata
+            doc_metadata = self.processor.get_document_metadata(file_path)
+            
+            # Combine document-level and chunk-level metadata
+            chunk_metadata = []
+            for chunk_meta in chunk_specific_metadata:
+                combined_meta = {**doc_metadata, **chunk_meta}
+                chunk_metadata.append(combined_meta)
             
             # Generate embeddings and store
             cloud_success = False

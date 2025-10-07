@@ -3,7 +3,7 @@ Document processing service for loading and chunking documents.
 """
 import os
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
     TextLoader,
@@ -34,7 +34,7 @@ class DocumentProcessor:
             f"chunk_overlap={settings.chunk_overlap}"
         )
     
-    def load_document(self, file_path: str) -> List[str]:
+    def load_document(self, file_path: str) -> Tuple[List[str], List[Dict]]:
         """
         Load and chunk a document based on its file type.
         
@@ -42,7 +42,7 @@ class DocumentProcessor:
             file_path: Path to the document file
             
         Returns:
-            List of text chunks
+            Tuple of (List of text chunks, List of metadata dicts for each chunk)
         """
         try:
             app_logger.info(f"Loading document: {file_path}")
@@ -65,17 +65,39 @@ class DocumentProcessor:
             # Load documents
             documents = loader.load()
             
-            # Combine all document content
-            full_text = "\n\n".join([doc.page_content for doc in documents])
+            # For PDFs, we want to preserve page information
+            # Split into chunks while preserving metadata
+            chunks = []
+            chunk_metadata = []
             
-            # Split into chunks
-            chunks = self.text_splitter.split_text(full_text)
+            for doc in documents:
+                # Extract page number from metadata if available
+                page_num = doc.metadata.get('page', None)
+                if page_num is not None:
+                    page_num = page_num + 1  # Convert 0-indexed to 1-indexed
+                
+                # Extract header/title from first line of content
+                content_lines = doc.page_content.strip().split('\n')
+                header = content_lines[0][:100] if content_lines else ""  # First 100 chars as header
+                
+                # Split this document into chunks
+                doc_chunks = self.text_splitter.split_text(doc.page_content)
+                
+                for chunk in doc_chunks:
+                    chunks.append(chunk)
+                    # Store metadata for each chunk
+                    chunk_meta = {
+                        'page': page_num,
+                        'header': header.strip(),
+                        'source': doc.metadata.get('source', file_path)
+                    }
+                    chunk_metadata.append(chunk_meta)
             
             app_logger.info(
                 f"Successfully loaded and chunked document: {file_path} "
                 f"into {len(chunks)} chunks"
             )
-            return chunks
+            return chunks, chunk_metadata
             
         except Exception as e:
             error_logger.error(f"Failed to load document {file_path}: {e}")

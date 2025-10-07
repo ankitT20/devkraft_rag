@@ -38,7 +38,7 @@ class RAGService:
         user_query: str, 
         model_type: str = "gemini",
         chat_id: Optional[str] = None
-    ) -> Tuple[str, Optional[str], str]:
+    ) -> Tuple[str, Optional[str], str, List[Dict]]:
         """
         Process a user query using RAG.
         
@@ -48,7 +48,7 @@ class RAGService:
             chat_id: Optional chat session ID
             
         Returns:
-            Tuple of (response, thinking_text, chat_id)
+            Tuple of (response, thinking_text, chat_id, sources)
         """
         try:
             app_logger.info(f"Processing RAG query with model_type={model_type}")
@@ -101,8 +101,11 @@ class RAGService:
             
             self._save_chat_history(chat_id, chat_history, model_type)
             
+            # Format sources for display
+            sources = self._format_sources(search_results)
+            
             app_logger.info(f"Successfully processed RAG query for chat_id={chat_id}")
-            return response, thinking, chat_id
+            return response, thinking, chat_id, sources
             
         except Exception as e:
             error_logger.error(f"Failed to process RAG query: {e}")
@@ -126,6 +129,30 @@ class RAGService:
             context_parts.append(f"[Document {i}]\n{result['text']}")
         
         return "\n\n".join(context_parts)
+    
+    def _format_sources(self, search_results: List[Dict]) -> List[Dict]:
+        """
+        Format search results into sources for display.
+        
+        Args:
+            search_results: List of search results
+            
+        Returns:
+            List of formatted source dictionaries
+        """
+        sources = []
+        for i, result in enumerate(search_results, 1):
+            metadata = result.get('metadata', {})
+            source_info = {
+                'index': i,
+                'title': metadata.get('header', 'N/A'),
+                'source': metadata.get('filename', 'Unknown'),
+                'page': metadata.get('page', 'N/A'),
+                'score': round(result.get('score', 0), 3)
+            }
+            sources.append(source_info)
+        
+        return sources
     
     def _load_chat_history(self, chat_id: str) -> List[Dict]:
         """

@@ -235,6 +235,17 @@ def main():
         with st.chat_message(role):
             st.markdown(content)
             
+            # Show sources for assistant messages
+            if role == "assistant" and message.get("sources"):
+                with st.expander("📚 Show Sources", expanded=False):
+                    for source in message["sources"]:
+                        st.markdown(f"**Source {source['index']}:**")
+                        st.markdown(f"- **Title/Header:** {source['title']}")
+                        st.markdown(f"- **Source:** {source['source']}")
+                        st.markdown(f"- **Page:** {source['page']}")
+                        st.markdown(f"- **Relevance Score:** {source['score']}")
+                        st.markdown("---")
+            
             # Show thinking box for assistant messages in qwen3 mode
             if (role == "assistant" and 
                 st.session_state.model_type == "qwen3" and 
@@ -292,6 +303,17 @@ def main():
                     # Display response
                     st.markdown(result["response"])
                     
+                    # Show sources
+                    if result.get("sources"):
+                        with st.expander("📚 Show Sources", expanded=False):
+                            for source in result["sources"]:
+                                st.markdown(f"**Source {source['index']}:**")
+                                st.markdown(f"- **Title/Header:** {source['title']}")
+                                st.markdown(f"- **Source:** {source['source']}")
+                                st.markdown(f"- **Page:** {source['page']}")
+                                st.markdown(f"- **Relevance Score:** {source['score']}")
+                                st.markdown("---")
+                    
                     # Show thinking for qwen3
                     if result.get("thinking") and st.session_state.model_type == "qwen3":
                         with st.expander("🧠 Show Thinking", expanded=False):
@@ -317,7 +339,8 @@ def main():
                         "role": "assistant",
                         "content": result["response"],
                         "timestamp": datetime.now().isoformat(),
-                        "thinking": result.get("thinking")
+                        "thinking": result.get("thinking"),
+                        "sources": result.get("sources", [])
                     })
                 else:
                     st.error("Failed to get response from API")
