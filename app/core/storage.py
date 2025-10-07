@@ -2,9 +2,10 @@
 Qdrant vector storage service for managing document embeddings.
 """
 import uuid
+from uuid_extensions import uuid7
 from typing import List, Dict, Tuple
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
 from app.config import settings
 from app.utils.logging_config import app_logger, error_logger
@@ -88,11 +89,50 @@ class QdrantStorage:
             error_logger.error(f"Failed to ensure collection {collection_name}: {e}")
             raise
     
+    def check_document_exists(self, md5_hash: str, collection_name: str = None) -> bool:
+        """
+        Check if a document with the given MD5 hash already exists in the collection.
+        
+        Args:
+            md5_hash: MD5 hash of the document
+            collection_name: Optional collection name (defaults to cloud collection)
+            
+        Returns:
+            True if document exists, False otherwise
+        """
+        try:
+            if collection_name is None:
+                collection_name = self.cloud_collection
+            
+            # Search for documents with this MD5
+            results = self.cloud_client.scroll(
+                collection_name=collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="md5",
+                            match=MatchValue(value=md5_hash)
+                        )
+                    ]
+                ),
+                limit=1
+            )
+            
+            exists = len(results[0]) > 0
+            if exists:
+                app_logger.info(f"Document with MD5 {md5_hash} already exists in {collection_name}")
+            return exists
+            
+        except Exception as e:
+            error_logger.error(f"Failed to check document existence: {e}")
+            return False
+    
     def store_embeddings_cloud(
         self, 
         embeddings: List[List[float]], 
         texts: List[str], 
-        metadata: List[Dict] = None
+        metadata: List[Dict] = None,
+        md5_hash: str = None
     ) -> bool:
         """
         Store embeddings in Qdrant Cloud collection.
@@ -101,18 +141,25 @@ class QdrantStorage:
             embeddings: List of embedding vectors
             texts: List of original texts
             metadata: Optional metadata for each text
+            md5_hash: MD5 hash of the source document
             
         Returns:
             True if successful, False otherwise
         """
         try:
+            # Check if document already exists
+            if md5_hash and self.check_document_exists(md5_hash, self.cloud_collection):
+                app_logger.info(f"Skipping document with MD5 {md5_hash} - already exists")
+                return False
+            
             app_logger.info(f"Storing {len(embeddings)} embeddings in cloud collection")
             
             points = []
             for i, (embedding, text) in enumerate(zip(embeddings, texts)):
-                point_id = str(uuid.uuid4())
+                point_id = str(uuid7())  # Use UUIDv7 for monotonic growth
                 payload = {
                     "text": text,
+                    "md5": md5_hash,
                     "metadata": metadata[i] if metadata else {}
                 }
                 points.append(PointStruct(
@@ -137,7 +184,8 @@ class QdrantStorage:
         self, 
         embeddings: List[List[float]], 
         texts: List[str], 
-        metadata: List[Dict] = None
+        metadata: List[Dict] = None,
+        md5_hash: str = None
     ) -> bool:
         """
         Store embeddings in Qdrant Docker collection with cloud replication.
@@ -147,19 +195,26 @@ class QdrantStorage:
             embeddings: List of embedding vectors
             texts: List of original texts
             metadata: Optional metadata for each text
+            md5_hash: MD5 hash of the source document
             
         Returns:
             True if at least one storage succeeded, False otherwise
         """
+        # Check if document already exists
+        if md5_hash and self.check_document_exists(md5_hash, self.cloud_docker_collection):
+            app_logger.info(f"Skipping document with MD5 {md5_hash} - already exists")
+            return False
+        
         docker_success = False
         cloud_success = False
         
         # Prepare points
         points = []
         for i, (embedding, text) in enumerate(zip(embeddings, texts)):
-            point_id = str(uuid.uuid4())
+            point_id = str(uuid7())  # Use UUIDv7 for monotonic growth
             payload = {
                 "text": text,
+                "md5": md5_hash,
                 "metadata": metadata[i] if metadata else {}
             }
             points.append(PointStruct(
@@ -206,7 +261,7 @@ class QdrantStorage:
             limit: Number of results to return
             
         Returns:
-            List of search results with text and metadata
+            List of search results with text, metadata, md5, and score
         """
         try:
             app_logger.info(f"Searching cloud collection with limit={limit}")
@@ -222,7 +277,9 @@ class QdrantStorage:
                 search_results.append({
                     "text": result.payload["text"],
                     "metadata": result.payload.get("metadata", {}),
-                    "score": result.score
+                    "md5": result.payload.get("md5", ""),
+                    "score": result.score,
+                    "id": str(result.id)
                 })
             
             app_logger.info(f"Found {len(search_results)} results in cloud collection")
@@ -260,7 +317,9 @@ class QdrantStorage:
                     search_results.append({
                         "text": result.payload["text"],
                         "metadata": result.payload.get("metadata", {}),
-                        "score": result.score
+                        "md5": result.payload.get("md5", ""),
+                        "score": result.score,
+                        "id": str(result.id)
                     })
                 
                 app_logger.info(f"Found {len(search_results)} results in docker collection (localhost)")
@@ -286,7 +345,9 @@ class QdrantStorage:
                 search_results.append({
                     "text": result.payload["text"],
                     "metadata": result.payload.get("metadata", {}),
-                    "score": result.score
+                    "md5": result.payload.get("md5", ""),
+                    "score": result.score,
+                    "id": str(result.id)
                 })
             
             app_logger.info(f"Found {len(search_results)} results in cloud docker collection")

@@ -28,3 +28,4 @@ pandas==2.2.3
 python-dotenv==1.0.1
 requests==2.32.3
 aiofiles==24.1.0
+uuid7==0.1.0

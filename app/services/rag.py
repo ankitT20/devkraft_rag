@@ -38,7 +38,7 @@ class RAGService:
         user_query: str, 
         model_type: str = "gemini",
         chat_id: Optional[str] = None
-    ) -> Tuple[str, Optional[str], str]:
+    ) -> Tuple[str, Optional[str], str, List[Dict]]:
         """
         Process a user query using RAG.
         
@@ -48,7 +48,7 @@ class RAGService:
             chat_id: Optional chat session ID
             
         Returns:
-            Tuple of (response, thinking_text, chat_id)
+            Tuple of (response, thinking_text, chat_id, sources)
         """
         try:
             app_logger.info(f"Processing RAG query with model_type={model_type}")
@@ -71,20 +71,24 @@ class RAGService:
             # Build context from search results
             context = self._build_context(search_results)
             
-            # Generate response
+            # Generate response with source tracking
             thinking = None
+            used_sources = []
             if model_type == "gemini":
-                response = self.gemini_llm.generate_response(
+                response, used_sources = self.gemini_llm.generate_response_with_sources(
                     user_query, 
                     context, 
                     chat_history
                 )
             else:  # qwen3
-                response, thinking = self.local_llm.generate_response(
+                response, thinking, used_sources = self.local_llm.generate_response_with_sources(
                     user_query, 
                     context, 
                     chat_history
                 )
+            
+            # Extract actual sources based on used_sources indices
+            sources = self._extract_sources(search_results, used_sources)
             
             # Update chat history
             chat_history.append({
@@ -96,13 +100,14 @@ class RAGService:
                 "role": "assistant",
                 "content": response,
                 "timestamp": datetime.now().isoformat(),
-                "thinking": thinking
+                "thinking": thinking,
+                "sources": sources
             })
             
             self._save_chat_history(chat_id, chat_history, model_type)
             
             app_logger.info(f"Successfully processed RAG query for chat_id={chat_id}")
-            return response, thinking, chat_id
+            return response, thinking, chat_id, sources
             
         except Exception as e:
             error_logger.error(f"Failed to process RAG query: {e}")
@@ -126,6 +131,41 @@ class RAGService:
             context_parts.append(f"[Document {i}]\n{result['text']}")
         
         return "\n\n".join(context_parts)
+    
+    def _extract_sources(self, search_results: List[Dict], used_indices: List[int]) -> List[Dict]:
+        """
+        Extract sources based on document indices used by the LLM.
+        
+        Args:
+            search_results: All search results
+            used_indices: List of document indices (1-based) used by the LLM
+            
+        Returns:
+            List of source information dictionaries (max 3)
+        """
+        sources = []
+        
+        # If no indices provided, use all sources in order
+        if not used_indices:
+            used_indices = list(range(1, min(4, len(search_results) + 1)))
+        
+        # Limit to first 3 sources
+        for idx in used_indices[:3]:
+            # Convert to 0-based index
+            if 1 <= idx <= len(search_results):
+                result = search_results[idx - 1]
+                metadata = result.get("metadata", {})
+                
+                source = {
+                    "header": metadata.get("header", "Unknown"),
+                    "page": metadata.get("page", 1),
+                    "filename": metadata.get("filename", "Unknown"),
+                    "text": result.get("text", ""),
+                    "chunkno": metadata.get("chunkno", "00001")
+                }
+                sources.append(source)
+        
+        return sources
     
     def _load_chat_history(self, chat_id: str) -> List[Dict]:
         """

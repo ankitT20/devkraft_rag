@@ -25,7 +25,7 @@ class GeminiLLM:
     
     def generate_response(self, query: str, context: str, chat_history: List[Dict[str, str]] = None) -> str:
         """
-        Generate response using Gemini.
+        Generate response using Gemini (legacy method, kept for compatibility).
         
         Args:
             query: User query
@@ -35,11 +35,26 @@ class GeminiLLM:
         Returns:
             Generated response text
         """
+        response, _ = self.generate_response_with_sources(query, context, chat_history)
+        return response
+    
+    def generate_response_with_sources(self, query: str, context: str, chat_history: List[Dict[str, str]] = None) -> Tuple[str, List[int]]:
+        """
+        Generate response using Gemini with source tracking.
+        
+        Args:
+            query: User query
+            context: Retrieved context from RAG
+            chat_history: Optional chat history
+            
+        Returns:
+            Tuple of (response_text, list of document indices used)
+        """
         try:
-            app_logger.info("Generating Gemini response")
+            app_logger.info("Generating Gemini response with source tracking")
             
             # Build the prompt
-            prompt = self._build_prompt(query, context)
+            prompt = self._build_prompt_with_sources(query, context)
             
             # Build contents with history
             contents = []
@@ -64,8 +79,12 @@ class GeminiLLM:
             )
             
             result = response.text
-            app_logger.info("Successfully generated Gemini response")
-            return result
+            
+            # Extract sources from response
+            sources = self._extract_source_indices(result)
+            
+            app_logger.info(f"Successfully generated Gemini response with sources: {sources}")
+            return result, sources
             
         except Exception as e:
             error_logger.error(f"Failed to generate Gemini response: {e}")
@@ -85,6 +104,36 @@ QUESTION: {query}
 
 ANSWER:"""
         return prompt
+    
+    def _build_prompt_with_sources(self, query: str, context: str) -> str:
+        """Build the RAG prompt with source tracking."""
+        prompt = f"""You are a helpful and informative bot that answers questions using text from the reference passages included below. 
+Be sure to respond in a complete sentence, being comprehensive, including all relevant background information.
+
+However, you are talking to a non-technical audience, so be sure to break down complicated concepts and strike a friendly and conversational tone. 
+If the passage is irrelevant to the answer, you may ignore it.
+
+CONTEXT: {context}
+
+QUESTION: {query}
+
+ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by the document numbers you used, comma-separated, in order of relevance)"""
+        return prompt
+    
+    def _extract_source_indices(self, response: str) -> List[int]:
+        """Extract source document indices from response."""
+        import re
+        sources = []
+        
+        # Look for "SOURCES: 1, 2, 3" pattern
+        match = re.search(r'SOURCES:\s*([0-9,\s]+)', response, re.IGNORECASE)
+        if match:
+            source_str = match.group(1)
+            # Extract all numbers
+            numbers = re.findall(r'\d+', source_str)
+            sources = [int(n) for n in numbers if 1 <= int(n) <= 4]
+        
+        return sources
 
 
 class LocalLLM:
@@ -126,7 +175,7 @@ class LocalLLM:
         chat_history: List[Dict[str, str]] = None
     ) -> Tuple[str, Optional[str]]:
         """
-        Generate response using Local LLM.
+        Generate response using Local LLM (legacy method, kept for compatibility).
         
         Args:
             query: User query
@@ -136,8 +185,28 @@ class LocalLLM:
         Returns:
             Tuple of (response_text, thinking_text)
         """
+        response, thinking, _ = self.generate_response_with_sources(query, context, chat_history)
+        return response, thinking
+    
+    def generate_response_with_sources(
+        self, 
+        query: str, 
+        context: str, 
+        chat_history: List[Dict[str, str]] = None
+    ) -> Tuple[str, Optional[str], List[int]]:
+        """
+        Generate response using Local LLM with source tracking.
+        
+        Args:
+            query: User query
+            context: Retrieved context from RAG
+            chat_history: Optional chat history
+            
+        Returns:
+            Tuple of (response_text, thinking_text, list of document indices used)
+        """
         try:
-            app_logger.info("Generating local LLM response")
+            app_logger.info("Generating local LLM response with source tracking")
             
             if self.use_fallback:
                 return self._generate_with_hf(query, context, chat_history)
@@ -162,9 +231,9 @@ class LocalLLM:
         query: str, 
         context: str, 
         chat_history: List[Dict[str, str]] = None
-    ) -> Tuple[str, Optional[str]]:
+    ) -> Tuple[str, Optional[str], List[int]]:
         """Generate response using LM Studio."""
-        prompt = self._build_prompt(query, context)
+        prompt = self._build_prompt_with_sources(query, context)
         
         messages = []
         if chat_history:
@@ -186,18 +255,19 @@ class LocalLLM:
         
         result = response.json()["choices"][0]["message"]["content"]
         cleaned_response, thinking = self._extract_thinking(result)
+        sources = self._extract_source_indices(cleaned_response)
         
         app_logger.info("Successfully generated LM Studio response")
-        return cleaned_response, thinking
+        return cleaned_response, thinking, sources
     
     def _generate_with_hf(
         self, 
         query: str, 
         context: str, 
         chat_history: List[Dict[str, str]] = None
-    ) -> Tuple[str, Optional[str]]:
+    ) -> Tuple[str, Optional[str], List[int]]:
         """Generate response using HuggingFace."""
-        prompt = self._build_prompt(query, context)
+        prompt = self._build_prompt_with_sources(query, context)
         
         messages = []
         if chat_history:
@@ -213,9 +283,10 @@ class LocalLLM:
         
         result = completion.choices[0].message.content
         cleaned_response, thinking = self._extract_thinking(result)
+        sources = self._extract_source_indices(cleaned_response)
         
         app_logger.info("Successfully generated HuggingFace response")
-        return cleaned_response, thinking
+        return cleaned_response, thinking, sources
     
     def _build_prompt(self, query: str, context: str) -> str:
         """Build the RAG prompt."""
@@ -231,6 +302,36 @@ QUESTION: {query}
 
 ANSWER:"""
         return prompt
+    
+    def _build_prompt_with_sources(self, query: str, context: str) -> str:
+        """Build the RAG prompt with source tracking."""
+        prompt = f"""You are a helpful and informative bot that answers questions using text from the reference passages included below. 
+Be sure to respond in a complete sentence, being comprehensive, including all relevant background information.
+
+However, you are talking to a non-technical audience, so be sure to break down complicated concepts and strike a friendly and conversational tone. 
+If the passage is irrelevant to the answer, you may ignore it.
+
+CONTEXT: {context}
+
+QUESTION: {query}
+
+ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by the document numbers you used, comma-separated, in order of relevance)"""
+        return prompt
+    
+    def _extract_source_indices(self, response: str) -> List[int]:
+        """Extract source document indices from response."""
+        import re
+        sources = []
+        
+        # Look for "SOURCES: 1, 2, 3" pattern
+        match = re.search(r'SOURCES:\s*([0-9,\s]+)', response, re.IGNORECASE)
+        if match:
+            source_str = match.group(1)
+            # Extract all numbers
+            numbers = re.findall(r'\d+', source_str)
+            sources = [int(n) for n in numbers if 1 <= int(n) <= 4]
+        
+        return sources
     
     def _extract_thinking(self, response: str) -> Tuple[str, Optional[str]]:
         """

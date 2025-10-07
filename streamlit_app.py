@@ -64,6 +64,8 @@ def init_session_state():
         st.session_state.model_type = "gemini"
     if "show_thinking" not in st.session_state:
         st.session_state.show_thinking = {}
+    if "show_sources" not in st.session_state:
+        st.session_state.show_sources = {}
 
 
 def load_chat_history(chat_id: str):
@@ -110,6 +112,7 @@ def send_query(query: str, model_type: str, chat_id: str = None):
         if response.status_code == 200:
             result = response.json()
             logger.info(f"Query successful, received response for chat_id: {result.get('chat_id')}")
+            logger.info(f"Sources: {result.get('sources', [])}")
             return result
         else:
             logger.error(f"API error: {response.status_code}")
@@ -247,6 +250,18 @@ def main():
                 with st.expander("🧠 Show Thinking", expanded=False):
                     st.text(message["thinking"])
             
+            # Show sources box for assistant messages
+            if role == "assistant" and message.get("sources"):
+                sources = message["sources"]
+                with st.expander("📚 Show Sources", expanded=False):
+                    for idx, source in enumerate(sources, 1):
+                        st.markdown(f"**{idx}. {source['header']}**")
+                        st.caption(f"*Page {source['page']} of {source['filename']}*")
+                        with st.expander("▶ View original source text"):
+                            st.text(source['text'])
+                        if idx < len(sources):
+                            st.markdown("---")
+            
             # Add Listen button for assistant messages
             if role == "assistant":
                 if st.button("🔊 Listen", key=f"listen_{i}"):
@@ -297,6 +312,18 @@ def main():
                         with st.expander("🧠 Show Thinking", expanded=False):
                             st.text(result["thinking"])
                     
+                    # Show sources
+                    if result.get("sources"):
+                        sources = result["sources"]
+                        with st.expander("📚 Show Sources", expanded=False):
+                            for idx, source in enumerate(sources, 1):
+                                st.markdown(f"**{idx}. {source['header']}**")
+                                st.caption(f"*Page {source['page']} of {source['filename']}*")
+                                with st.expander("▶ View original source text"):
+                                    st.text(source['text'])
+                                if idx < len(sources):
+                                    st.markdown("---")
+                    
                     # Add Listen button
                     if st.button("🔊 Listen", key=f"listen_new"):
                         with st.spinner("Generating audio..."):
@@ -317,7 +344,8 @@ def main():
                         "role": "assistant",
                         "content": result["response"],
                         "timestamp": datetime.now().isoformat(),
-                        "thinking": result.get("thinking")
+                        "thinking": result.get("thinking"),
+                        "sources": result.get("sources", [])
                     })
                 else:
                     st.error("Failed to get response from API")
