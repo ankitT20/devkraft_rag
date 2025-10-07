@@ -257,7 +257,9 @@ def main():
                     for idx, source in enumerate(sources, 1):
                         st.markdown(f"**{idx}. {source['header']}**")
                         st.caption(f"*Page {source['page']} of {source['filename']}*")
-                        with st.expander("▶ View original source text"):
+                        # Use checkbox to toggle source text display
+                        show_text_key = f"show_source_{i}_{idx}"
+                        if st.checkbox(f"▶ View original source text", key=show_text_key):
                             st.text(source['text'])
                         if idx < len(sources):
                             st.markdown("---")
@@ -319,7 +321,9 @@ def main():
                             for idx, source in enumerate(sources, 1):
                                 st.markdown(f"**{idx}. {source['header']}**")
                                 st.caption(f"*Page {source['page']} of {source['filename']}*")
-                                with st.expander("▶ View original source text"):
+                                # Use checkbox to toggle source text display
+                                show_text_key = f"show_source_new_{idx}"
+                                if st.checkbox(f"▶ View original source text", key=show_text_key):
                                     st.text(source['text'])
                                 if idx < len(sources):
                                     st.markdown("---")
