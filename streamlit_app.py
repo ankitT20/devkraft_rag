@@ -261,7 +261,7 @@ def main():
                         if source.get('text'):
                             st.markdown(f"""
                             <details>
-                            <summary>▶ View original source text</summary>
+                            <summary>Click to view original source text</summary>
                             <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
                             </details>
                             """, unsafe_allow_html=True)
