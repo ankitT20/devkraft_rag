@@ -7,7 +7,7 @@ A simple Retrieval-Augmented Generation (RAG) system with a Streamlit UI, FastAP
 - 🤖 **Dual Model Support**: Choose between Gemini Cloud (gemini-2.5-flash) or Local LMStudio/HF (qwen3-1.7b)
 - 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD)
 - 💾 **Vector Storage**: Dual storage with Qdrant Cloud and Docker
-- 💬 **Chat History**: Persistent chat sessions with history management
+- 💬 **Chat History**: Persistent chat sessions stored in MongoDB Atlas (with JSON file fallback)
 - 🧠 **Thinking Display**: View model reasoning process (qwen3)
 - 🔍 **RAG Pipeline**: Semantic search and context-aware responses
 
@@ -19,7 +19,8 @@ devkraft_rag/
 │   ├── core/              # Core functionality
 │   │   ├── embeddings.py  # Embedding services (Gemini, Local/HF)
 │   │   ├── llm.py         # LLM services (Gemini, Local/HF)
-│   │   └── storage.py     # Qdrant vector storage
+│   │   ├── storage.py     # Qdrant vector storage
+│   │   └── chat_storage.py # MongoDB chat history storage
 │   ├── services/          # Business logic
 │   │   ├── document_processor.py  # Document loading and chunking
 │   │   ├── ingestion.py   # Document ingestion pipeline
@@ -47,9 +48,16 @@ Set the following environment variables:
 export GEMINI_API_KEY="your_gemini_api_key"
 export QDRANT_API_KEY="your_qdrant_api_key"
 export HF_TOKEN="your_huggingface_token"
+export MONGO_URI="mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true"
 ```
 
 Or create a `.env` file (see `.env.example`).
+
+**MongoDB Atlas Setup (Optional):**
+- If `MONGO_URI` is provided, chat history will be stored in MongoDB Atlas
+- The application automatically appends `&w=majority&appName=ragcluster` to the URI
+- If MongoDB is unavailable or not configured, the app falls back to JSON files in `user_chat/`
+- No code changes needed - fallback is automatic
 
 ### 2. Install Dependencies
 
@@ -162,6 +170,7 @@ Visit http://localhost:8000/docs for interactive API documentation.
 All application settings are centralized in `app/config.py`. You can customize:
 
 - API keys and tokens (via environment variables or .env file)
+- MongoDB connection URI for chat history storage
 - Chunk size and overlap for document processing
 - Model names for embeddings and LLM
 - Qdrant URLs and collection names
@@ -169,6 +178,22 @@ All application settings are centralized in `app/config.py`. You can customize:
 - LM Studio configuration
 
 See `app/config.py` for all available settings.
+
+### Chat History Storage
+
+The application uses a dual-storage strategy for chat history:
+
+1. **Primary Storage**: MongoDB Atlas (when `MONGO_URI` is configured)
+   - Persistent cloud storage
+   - Better query performance for large chat histories
+   - Automatic indexing on `chat_id` and `updated_at`
+
+2. **Fallback Storage**: JSON files in `user_chat/` folder
+   - Activated when MongoDB is unavailable or not configured
+   - Zero-configuration required
+   - Compatible with existing chat history files
+
+The application automatically handles the fallback logic. You don't need to modify any code.
 
 ## Logging
 
