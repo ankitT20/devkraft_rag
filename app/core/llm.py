@@ -2,8 +2,9 @@
 LLM services for chat completions using Gemini and Local/HF models.
 """
 import os
+import re
 import requests
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Iterator, AsyncIterator
 from google import genai
 from google.genai import types
 from huggingface_hub import InferenceClient
@@ -140,10 +141,66 @@ ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed 
     
     def _remove_sources_line(self, response: str) -> str:
         """Remove the SOURCES line from the response."""
-        import re
         # Remove the entire SOURCES line
         cleaned = re.sub(r'\n*SOURCES:\s*[0-9,\s]+\s*$', '', response, flags=re.IGNORECASE)
         return cleaned.strip()
+    
+    async def generate_response_stream(
+        self, 
+        query: str, 
+        context: str, 
+        chat_history: List[Dict[str, str]] = None
+    ) -> AsyncIterator[str]:
+        """
+        Generate streaming response using Gemini with source tracking.
+        
+        Args:
+            query: User query
+            context: Retrieved context from RAG
+            chat_history: Optional chat history
+            
+        Yields:
+            Response text chunks
+        """
+        try:
+            app_logger.info("Generating Gemini streaming response with source tracking")
+            
+            # Build the prompt
+            prompt = self._build_prompt_with_sources(query, context)
+            
+            # Build contents with history
+            contents = []
+            if chat_history:
+                for msg in chat_history[-5:]:  # Last 5 messages for context
+                    role = "user" if msg["role"] == "user" else "model"
+                    contents.append(types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=msg["content"])]
+                    ))
+            
+            # Add current query
+            contents.append(types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            ))
+            
+            # Generate streaming response
+            response = self.client.models.generate_content_stream(
+                model=self.model,
+                contents=contents
+            )
+            
+            full_response = ""
+            for chunk in response:
+                if chunk.text:
+                    full_response += chunk.text
+                    yield chunk.text
+            
+            app_logger.info("Successfully generated Gemini streaming response")
+            
+        except Exception as e:
+            error_logger.error(f"Failed to generate Gemini streaming response: {e}")
+            raise
 
 
 class LocalLLM:
@@ -369,3 +426,118 @@ ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed 
             cleaned_response = response[:start] + response[end:]
             return cleaned_response.strip(), thinking
         return response, None
+    
+    async def generate_response_stream(
+        self, 
+        query: str, 
+        context: str, 
+        chat_history: List[Dict[str, str]] = None
+    ) -> AsyncIterator[str]:
+        """
+        Generate streaming response using Local LLM with source tracking.
+        
+        Args:
+            query: User query
+            context: Retrieved context from RAG
+            chat_history: Optional chat history
+            
+        Yields:
+            Response text chunks
+        """
+        try:
+            app_logger.info("Generating local LLM streaming response with source tracking")
+            
+            if self.use_fallback:
+                async for chunk in self._generate_stream_with_hf(query, context, chat_history):
+                    yield chunk
+            else:
+                try:
+                    async for chunk in self._generate_stream_with_lmstudio(query, context, chat_history):
+                        yield chunk
+                except Exception as e:
+                    app_logger.warning(f"LM Studio failed: {e}, falling back to HuggingFace")
+                    self.use_fallback = True
+                    self.hf_client = InferenceClient(
+                        provider="featherless-ai",
+                        api_key=settings.hf_token
+                    )
+                    async for chunk in self._generate_stream_with_hf(query, context, chat_history):
+                        yield chunk
+                    
+        except Exception as e:
+            error_logger.error(f"Failed to generate local streaming response: {e}")
+            raise
+    
+    async def _generate_stream_with_lmstudio(
+        self, 
+        query: str, 
+        context: str, 
+        chat_history: List[Dict[str, str]] = None
+    ) -> AsyncIterator[str]:
+        """Generate streaming response using LM Studio."""
+        prompt = self._build_prompt_with_sources(query, context)
+        
+        messages = []
+        if chat_history:
+            messages.extend(chat_history[-5:])  # Last 5 messages
+        messages.append({"role": "user", "content": prompt})
+        
+        response = requests.post(
+            f"{self.lmstudio_url}/v1/chat/completions",
+            json={
+                "model": self.local_model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 1000,
+                "stream": True
+            },
+            timeout=200,
+            stream=True
+        )
+        response.raise_for_status()
+        
+        for line in response.iter_lines():
+            if line:
+                line_str = line.decode('utf-8')
+                if line_str.startswith('data: '):
+                    data = line_str[6:]
+                    if data == '[DONE]':
+                        break
+                    try:
+                        import json
+                        chunk_data = json.loads(data)
+                        content = chunk_data.get('choices', [{}])[0].get('delta', {}).get('content', '')
+                        if content:
+                            yield content
+                    except json.JSONDecodeError:
+                        continue
+        
+        app_logger.info("Successfully generated LM Studio streaming response")
+    
+    async def _generate_stream_with_hf(
+        self, 
+        query: str, 
+        context: str, 
+        chat_history: List[Dict[str, str]] = None
+    ) -> AsyncIterator[str]:
+        """Generate streaming response using HuggingFace."""
+        prompt = self._build_prompt_with_sources(query, context)
+        
+        messages = []
+        if chat_history:
+            messages.extend(chat_history[-5:])  # Last 5 messages
+        messages.append({"role": "user", "content": prompt})
+        
+        stream = self.hf_client.chat.completions.create(
+            model=self.hf_model,
+            messages=messages,
+            max_tokens=1000,
+            temperature=0.7,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+        
+        app_logger.info("Successfully generated HuggingFace streaming response")

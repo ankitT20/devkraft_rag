@@ -3,9 +3,10 @@ RAG (Retrieval-Augmented Generation) service for query processing.
 """
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, AsyncIterator
 from uuid import uuid4
 
 from app.config import settings
@@ -286,3 +287,127 @@ class RAGService:
                 error_logger.error(f"Failed to load chat history {chat_id}: {e}")
         
         return {"messages": []}
+    
+    async def query_stream(
+        self, 
+        user_query: str, 
+        model_type: str = "gemini",
+        chat_id: Optional[str] = None
+    ) -> AsyncIterator[Dict]:
+        """
+        Process a user query using RAG with streaming response.
+        
+        Args:
+            user_query: User's question
+            model_type: "gemini" or "qwen3"
+            chat_id: Optional chat session ID
+            
+        Yields:
+            Dictionary with 'type' and 'content' fields:
+            - type='chunk': content contains response text chunk
+            - type='metadata': content contains final metadata (thinking, sources, chat_id)
+        """
+        try:
+            app_logger.info(f"Processing streaming RAG query with model_type={model_type}")
+            
+            # Create or load chat history
+            if not chat_id:
+                chat_id = str(uuid4())
+            
+            chat_history = self._load_chat_history(chat_id)
+            
+            # Generate query embedding and retrieve context
+            if model_type == "gemini":
+                query_embedding = self.gemini_embedding.embed_query(user_query)
+                search_results = self.storage.search_cloud(query_embedding, limit=4)
+            else:  # qwen3
+                query_embedding = self.local_embedding.embed_query(user_query)
+                search_results = self.storage.search_docker(query_embedding, limit=4)
+            
+            # Build context from search results
+            context = self._build_context(search_results)
+            
+            # Generate streaming response
+            full_response = ""
+            if model_type == "gemini":
+                async for chunk in self.gemini_llm.generate_response_stream(
+                    user_query, 
+                    context, 
+                    chat_history
+                ):
+                    full_response += chunk
+                    yield {"type": "chunk", "content": chunk}
+                thinking = None
+            else:  # qwen3
+                async for chunk in self.local_llm.generate_response_stream(
+                    user_query, 
+                    context, 
+                    chat_history
+                ):
+                    full_response += chunk
+                    yield {"type": "chunk", "content": chunk}
+                
+                # Extract thinking after streaming complete
+                full_response, thinking = self._extract_thinking_from_response(full_response)
+            
+            # Extract sources from complete response
+            used_sources = self._extract_source_indices_from_response(full_response)
+            full_response = self._remove_sources_line_from_response(full_response)
+            sources = self._extract_sources(search_results, used_sources)
+            
+            # Update chat history
+            chat_history.append({
+                "role": "user",
+                "content": user_query,
+                "timestamp": datetime.now().isoformat()
+            })
+            chat_history.append({
+                "role": "assistant",
+                "content": full_response,
+                "timestamp": datetime.now().isoformat(),
+                "thinking": thinking,
+                "sources": sources
+            })
+            
+            self._save_chat_history(chat_id, chat_history, model_type)
+            
+            # Send final metadata
+            yield {
+                "type": "metadata",
+                "content": {
+                    "thinking": thinking,
+                    "sources": sources,
+                    "chat_id": chat_id
+                }
+            }
+            
+            app_logger.info(f"Successfully processed streaming RAG query for chat_id={chat_id}")
+            
+        except Exception as e:
+            error_logger.error(f"Failed to process streaming RAG query: {e}")
+            raise
+    
+    def _extract_thinking_from_response(self, response: str) -> Tuple[str, Optional[str]]:
+        """Extract thinking block from response."""
+        if "<think>" in response and "</think>" in response:
+            start = response.find("<think>")
+            end = response.find("</think>") + len("</think>")
+            thinking = response[start + len("<think>"):end - len("</think>")].strip()
+            cleaned_response = response[:start] + response[end:]
+            return cleaned_response.strip(), thinking
+        return response, None
+    
+    def _extract_source_indices_from_response(self, response: str) -> List[int]:
+        """Extract source document indices from response."""
+        sources = []
+        match = re.search(r'SOURCES:\s*([0-9,\s]+)', response, re.IGNORECASE)
+        if match:
+            source_str = match.group(1)
+            numbers = re.findall(r'\d+', source_str)
+            sources = [int(n) for n in numbers if 1 <= int(n) <= 4]
+        return sources
+    
+    def _remove_sources_line_from_response(self, response: str) -> str:
+        """Remove the SOURCES line from the response."""
+        cleaned = re.sub(r'\n*SOURCES:\s*[0-9,\s]+\s*$', '', response, flags=re.IGNORECASE)
+        return cleaned.strip()

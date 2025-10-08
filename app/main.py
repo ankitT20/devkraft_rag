@@ -2,10 +2,12 @@
 FastAPI application for RAG system.
 """
 import os
+import json
 from pathlib import Path
 from typing import List
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, Response
 import aiofiles
 
 from app.config import settings
@@ -21,7 +23,6 @@ from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
 from app.core.tts import TTSService
 from app.utils.logging_config import app_logger, error_logger
-from fastapi.responses import Response
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -94,6 +95,42 @@ async def query(request: QueryRequest):
         
     except Exception as e:
         error_logger.error(f"Query endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/query/stream")
+async def query_stream(request: QueryRequest):
+    """
+    Process a RAG query with streaming response.
+    
+    Args:
+        request: Query request with user query and model type
+        
+    Returns:
+        Streaming response with chunks and metadata
+    """
+    try:
+        app_logger.info(f"Received streaming query request: model_type={request.model_type}")
+        
+        async def generate():
+            async for item in rag_service.query_stream(
+                user_query=request.query,
+                model_type=request.model_type,
+                chat_id=request.chat_id
+            ):
+                yield f"data: {json.dumps(item)}\n\n"
+        
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+        
+    except Exception as e:
+        error_logger.error(f"Streaming query endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

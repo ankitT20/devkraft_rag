@@ -123,6 +123,51 @@ def send_query(query: str, model_type: str, chat_id: str = None):
     return None
 
 
+def send_query_stream(query: str, model_type: str, chat_id: str = None):
+    """Send streaming query to API and yield chunks."""
+    try:
+        logger.info(f"Sending streaming query with model_type: {model_type}, chat_id: {chat_id}")
+        payload = {
+            "query": query,
+            "model_type": model_type,
+            "chat_id": chat_id
+        }
+        
+        response = requests.post(
+            f"{API_URL}/query/stream", 
+            json=payload,
+            stream=True,
+            headers={"Accept": "text/event-stream"}
+        )
+        
+        if response.status_code == 200:
+            metadata = {}
+            for line in response.iter_lines():
+                if line:
+                    line_str = line.decode('utf-8')
+                    if line_str.startswith('data: '):
+                        data_str = line_str[6:]
+                        try:
+                            import json
+                            data = json.loads(data_str)
+                            if data.get('type') == 'chunk':
+                                yield data.get('content', '')
+                            elif data.get('type') == 'metadata':
+                                metadata = data.get('content', {})
+                        except json.JSONDecodeError:
+                            continue
+            
+            return metadata
+        else:
+            logger.error(f"API error: {response.status_code}")
+            st.error(f"API error: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to send streaming query: {e}")
+        st.error(f"Failed to send streaming query: {e}")
+        return None
+
+
 def upload_document(file):
     """Upload document to API."""
     try:
@@ -296,69 +341,90 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        # Get response from API
+        # Get streaming response from API
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                result = send_query(
-                    prompt, 
-                    st.session_state.model_type,
-                    st.session_state.chat_id
-                )
-                
-                if result:
-                    # Update chat_id
-                    st.session_state.chat_id = result["chat_id"]
+            response_placeholder = st.empty()
+            full_response = ""
+            
+            # Stream the response
+            stream_generator = send_query_stream(
+                prompt, 
+                st.session_state.model_type,
+                st.session_state.chat_id
+            )
+            
+            if stream_generator:
+                metadata = None
+                try:
+                    for chunk in stream_generator:
+                        if isinstance(chunk, dict):
+                            # This is the metadata at the end
+                            metadata = chunk
+                            break
+                        else:
+                            # This is a text chunk
+                            full_response += chunk
+                            response_placeholder.markdown(full_response + "▌")
                     
-                    # Display response
-                    st.markdown(result["response"])
+                    # Remove cursor and show final response
+                    response_placeholder.markdown(full_response)
                     
-                    # Show thinking for qwen3
-                    if result.get("thinking") and st.session_state.model_type == "qwen3":
-                        with st.expander("🧠 Show Thinking", expanded=False):
-                            st.text(result["thinking"])
-                    
-                    # Show sources
-                    if result.get("sources"):
-                        sources = result["sources"]
-                        with st.expander("📚 Show Sources", expanded=False):
-                            for idx, source in enumerate(sources, 1):
-                                st.markdown(f"**{idx}. {source['header']}**")
-                                st.caption(f"*Page {source['page']} of {source['filename']}*")
-                                # Add collapsible section for original source text using details/summary
-                                if source.get('text'):
-                                    st.markdown(f"""
-                                    <details>
-                                    <summary>Click to view original source text</summary>
-                                    <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
-                                    </details>
-                                    """, unsafe_allow_html=True)
-                                st.markdown("---")
-                    
-                    # Add Listen button
-                    if st.button("🔊 Listen", key=f"listen_new"):
-                        with st.spinner("Generating audio..."):
-                            try:
-                                tts_response = requests.post(
-                                    f"{API_URL}/tts",
-                                    json={"text": result["response"]}
-                                )
-                                if tts_response.status_code == 200:
-                                    st.audio(tts_response.content, format="audio/wav", autoplay=True)
-                                else:
-                                    st.error("Failed to generate audio")
-                            except Exception as e:
-                                st.error(f"Audio generation error: {e}")
-                    
-                    # Add assistant message to chat
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": result["response"],
-                        "timestamp": datetime.now().isoformat(),
-                        "thinking": result.get("thinking"),
-                        "sources": result.get("sources", [])
-                    })
-                else:
-                    st.error("Failed to get response from API")
+                    if metadata:
+                        # Update chat_id
+                        st.session_state.chat_id = metadata.get("chat_id")
+                        
+                        # Show thinking for qwen3
+                        if metadata.get("thinking") and st.session_state.model_type == "qwen3":
+                            with st.expander("🧠 Show Thinking", expanded=False):
+                                st.text(metadata["thinking"])
+                        
+                        # Show sources
+                        if metadata.get("sources"):
+                            sources = metadata["sources"]
+                            with st.expander("📚 Show Sources", expanded=False):
+                                for idx, source in enumerate(sources, 1):
+                                    st.markdown(f"**{idx}. {source['header']}**")
+                                    st.caption(f"*Page {source['page']} of {source['filename']}*")
+                                    # Add collapsible section for original source text using details/summary
+                                    if source.get('text'):
+                                        st.markdown(f"""
+                                        <details>
+                                        <summary>Click to view original source text</summary>
+                                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
+                                        </details>
+                                        """, unsafe_allow_html=True)
+                                    st.markdown("---")
+                        
+                        # Add Listen button
+                        if st.button("🔊 Listen", key=f"listen_new"):
+                            with st.spinner("Generating audio..."):
+                                try:
+                                    tts_response = requests.post(
+                                        f"{API_URL}/tts",
+                                        json={"text": full_response}
+                                    )
+                                    if tts_response.status_code == 200:
+                                        st.audio(tts_response.content, format="audio/wav", autoplay=True)
+                                    else:
+                                        st.error("Failed to generate audio")
+                                except Exception as e:
+                                    st.error(f"Audio generation error: {e}")
+                        
+                        # Add assistant message to chat
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": full_response,
+                            "timestamp": datetime.now().isoformat(),
+                            "thinking": metadata.get("thinking"),
+                            "sources": metadata.get("sources", [])
+                        })
+                    else:
+                        st.error("Failed to get metadata from streaming response")
+                except Exception as e:
+                    logger.error(f"Error processing stream: {e}")
+                    st.error(f"Error processing stream: {e}")
+            else:
+                st.error("Failed to get response from API")
 
 
 if __name__ == "__main__":
