@@ -12,6 +12,7 @@ from app.config import settings
 from app.core.embeddings import GeminiEmbedding, LocalEmbedding
 from app.core.llm import GeminiLLM, LocalLLM
 from app.core.storage import QdrantStorage
+from app.core.chat_storage import ChatStorageService
 from app.utils.logging_config import app_logger, error_logger
 
 
@@ -27,8 +28,9 @@ class RAGService:
         self.gemini_llm = GeminiLLM()
         self.local_llm = LocalLLM()
         self.storage = QdrantStorage()
+        self.chat_storage = ChatStorageService()
         
-        # Ensure user_chat folder exists
+        # Ensure user_chat folder exists (for fallback)
         Path(settings.user_chat_folder).mkdir(parents=True, exist_ok=True)
         
         app_logger.info("Initialized RAGService")
@@ -169,7 +171,7 @@ class RAGService:
     
     def _load_chat_history(self, chat_id: str) -> List[Dict]:
         """
-        Load chat history from file.
+        Load chat history from MongoDB or JSON file fallback.
         
         Args:
             chat_id: Chat session ID
@@ -177,50 +179,22 @@ class RAGService:
         Returns:
             List of chat messages
         """
-        chat_file = Path(settings.user_chat_folder) / f"{chat_id}.json"
-        
-        if chat_file.exists():
-            try:
-                with open(chat_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    return data.get("messages", [])
-            except Exception as e:
-                error_logger.error(f"Failed to load chat history {chat_id}: {e}")
-                return []
-        
-        return []
+        return self.chat_storage.load_chat_history(chat_id)
     
     def _save_chat_history(self, chat_id: str, messages: List[Dict], model_type: str):
         """
-        Save chat history to file.
+        Save chat history to MongoDB or JSON file fallback.
         
         Args:
             chat_id: Chat session ID
             messages: List of chat messages
             model_type: Model type used
         """
-        chat_file = Path(settings.user_chat_folder) / f"{chat_id}.json"
-        
-        try:
-            data = {
-                "chat_id": chat_id,
-                "model_type": model_type,
-                "created_at": messages[0]["timestamp"] if messages else datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
-                "messages": messages
-            }
-            
-            with open(chat_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            
-            app_logger.info(f"Saved chat history for chat_id={chat_id}")
-            
-        except Exception as e:
-            error_logger.error(f"Failed to save chat history {chat_id}: {e}")
+        self.chat_storage.save_chat_history(chat_id, messages, model_type)
     
     def get_recent_chats(self, limit: int = 10) -> List[Dict]:
         """
-        Get recent chat sessions.
+        Get recent chat sessions from MongoDB or JSON file fallback.
         
         Args:
             limit: Maximum number of chats to return
@@ -228,47 +202,11 @@ class RAGService:
         Returns:
             List of chat metadata (excludes empty chats)
         """
-        chat_folder = Path(settings.user_chat_folder)
-        chat_files = sorted(
-            chat_folder.glob("*.json"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True
-        )
-        
-        recent_chats = []
-        for chat_file in chat_files[:limit * 2]:  # Get more to filter out empty ones
-            try:
-                with open(chat_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    messages = data.get("messages", [])
-                    
-                    # Only include chats with at least 1 message
-                    if len(messages) > 0:
-                        # Get first user message as preview
-                        preview = next(
-                            (msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]
-                             for msg in messages if msg["role"] == "user"),
-                            "No messages"
-                        )
-                        
-                        recent_chats.append({
-                            "chat_id": data.get("chat_id"),
-                            "model_type": data.get("model_type", "unknown"),
-                            "preview": preview,
-                            "updated_at": data.get("updated_at"),
-                            "message_count": len(messages)
-                        })
-                        
-                        if len(recent_chats) >= limit:
-                            break
-            except Exception as e:
-                error_logger.error(f"Failed to load chat file {chat_file}: {e}")
-        
-        return recent_chats
+        return self.chat_storage.get_recent_chats(limit)
     
     def get_chat_history(self, chat_id: str) -> Dict:
         """
-        Get full chat history for a chat session.
+        Get full chat history for a chat session from MongoDB or JSON file fallback.
         
         Args:
             chat_id: Chat session ID
@@ -276,16 +214,7 @@ class RAGService:
         Returns:
             Chat data dictionary
         """
-        chat_file = Path(settings.user_chat_folder) / f"{chat_id}.json"
-        
-        if chat_file.exists():
-            try:
-                with open(chat_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception as e:
-                error_logger.error(f"Failed to load chat history {chat_id}: {e}")
-        
-        return {"messages": []}
+        return self.chat_storage.get_chat_history(chat_id)
     
     def query_stream(
         self, 
