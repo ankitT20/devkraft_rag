@@ -265,6 +265,7 @@ def main():
                             <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
                             </details>
                             """, unsafe_allow_html=True)
+                        st.markdown("---")
             
             # Add Listen button for assistant messages
             if role == "assistant":
@@ -331,6 +332,7 @@ def main():
                                     <pre style="white-space: pre-wrap; word-wrap: break-word;">{source['text']}</pre>
                                     </details>
                                     """, unsafe_allow_html=True)
+                                st.markdown("---")
                     
                     # Add Listen button
                     if st.button("🔊 Listen", key=f"listen_new"):
