@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     qdrant_api_key: str = Field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
     hf_token: str = Field(default_factory=lambda: os.getenv("HF_TOKEN", ""))
     
+    # MongoDB Configuration
+    mongo_uri: str = Field(default_factory=lambda: os.getenv("MONGO_URI", ""))
+    mongo_db_name: str = "devkraft_rag"
+    mongo_collection_name: str = "chat_history"
+    
     # Qdrant Configuration
     qdrant_cloud_url: str = "https://7f6a07f7-8039-4473-acbf-be311a53b2bc.europe-west3-0.gcp.cloud.qdrant.io:6333"
     qdrant_docker_url: str = "http://localhost:6333"
