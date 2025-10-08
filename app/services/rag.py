@@ -286,3 +286,103 @@ class RAGService:
                 error_logger.error(f"Failed to load chat history {chat_id}: {e}")
         
         return {"messages": []}
+    
+    def query_stream(
+        self, 
+        user_query: str, 
+        model_type: str = "gemini",
+        chat_id: Optional[str] = None
+    ):
+        """
+        Process a user query using RAG with streaming response.
+        
+        Args:
+            user_query: User's question
+            model_type: "gemini" or "qwen3" (currently only gemini supports streaming)
+            chat_id: Optional chat session ID
+            
+        Yields:
+            Streaming response chunks and metadata
+        """
+        try:
+            app_logger.info(f"Processing streaming RAG query with model_type={model_type}")
+            
+            # Create or load chat history
+            if not chat_id:
+                chat_id = str(uuid4())
+            
+            chat_history = self._load_chat_history(chat_id)
+            
+            # Generate query embedding and retrieve context
+            if model_type == "gemini":
+                query_embedding = self.gemini_embedding.embed_query(user_query)
+                search_results = self.storage.search_cloud(query_embedding, limit=4)
+            else:  # qwen3
+                # For now, qwen3 doesn't support streaming, so we could fall back
+                # or return an error. Let's yield an error message.
+                yield "data: {\"error\": \"Streaming is currently only supported for Gemini model\"}\n\n"
+                return
+            
+            # Build context from search results
+            context = self._build_context(search_results)
+            
+            # Yield initial metadata
+            yield f"data: {{\"type\": \"start\", \"chat_id\": \"{chat_id}\"}}\n\n"
+            
+            # Generate streaming response
+            full_response = ""
+            sources = []
+            
+            for chunk in self.gemini_llm.generate_response_with_sources_stream(
+                user_query, 
+                context, 
+                chat_history
+            ):
+                # Check if this is the sources marker
+                if chunk.startswith("\n__SOURCES__:"):
+                    sources_str = chunk.replace("\n__SOURCES__:", "")
+                    if sources_str and sources_str != "":
+                        source_indices = [int(x) for x in sources_str.split(",") if x]
+                        sources = self._extract_sources(search_results, source_indices)
+                else:
+                    full_response += chunk
+                    # Yield the text chunk
+                    import json as json_lib
+                    yield f"data: {json_lib.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+            
+            # Clean the full response (remove SOURCES line)
+            full_response = self._remove_sources_line_from_text(full_response)
+            
+            # Update chat history
+            chat_history.append({
+                "role": "user",
+                "content": user_query,
+                "timestamp": datetime.now().isoformat()
+            })
+            chat_history.append({
+                "role": "assistant",
+                "content": full_response,
+                "timestamp": datetime.now().isoformat(),
+                "thinking": None,
+                "sources": sources
+            })
+            
+            self._save_chat_history(chat_id, chat_history, model_type)
+            
+            # Yield final metadata with sources
+            import json as json_lib
+            yield f"data: {json_lib.dumps({'type': 'end', 'sources': sources, 'chat_id': chat_id})}\n\n"
+            
+            app_logger.info(f"Successfully processed streaming RAG query for chat_id={chat_id}")
+            
+        except Exception as e:
+            error_logger.error(f"Failed to process streaming RAG query: {e}")
+            import json as json_lib
+            yield f"data: {json_lib.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    def _remove_sources_line_from_text(self, response: str) -> str:
+        """Remove the SOURCES line from the response."""
+        import re
+        # Remove the entire SOURCES line
+        cleaned = re.sub(r'\n*SOURCES:\s*[0-9,\s]+\s*$', '', response, flags=re.IGNORECASE)
+        return cleaned.strip()
