@@ -5,6 +5,7 @@ A simple Retrieval-Augmented Generation (RAG) system with a Streamlit UI, FastAP
 ## Features
 
 - 🤖 **Dual Model Support**: Choose between Gemini Cloud (gemini-2.5-flash) or Local LMStudio/HF (qwen3-1.7b)
+- ⚡ **Real-time Streaming**: Responses stream as they're generated, keeping users engaged (NEW!)
 - 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD)
 - 💾 **Vector Storage**: Dual storage with Qdrant Cloud and Docker
 - 💬 **Chat History**: Persistent chat sessions with history management
@@ -111,6 +112,15 @@ streamlit run streamlit_app.py
 - **API Documentation**: http://localhost:8000/docs
 
 ## Usage
+
+### Streaming Responses
+
+**NEW**: Responses now stream in real-time! Instead of waiting 5-20 seconds with a spinner, you'll see the response appear character-by-character as it's generated.
+
+- Text appears with a cursor indicator (▌) during streaming
+- Metadata (sources, thinking) displays after streaming completes
+- Works with both Gemini and Qwen3 models
+- See `STREAMING_IMPLEMENTATION.md` for technical details
 
 ### Model Selection
 
