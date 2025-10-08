@@ -2,7 +2,7 @@
 Qdrant vector storage service for managing document embeddings.
 """
 import uuid
-from uuid_extensions import uuid7
+from uuid_extensions import uuid7, uuid_to_datetime
 from typing import List, Dict, Tuple
 from datetime import datetime, timezone
 import struct
@@ -407,136 +407,130 @@ class QdrantStorage:
             error_logger.error(f"Failed to search cloud docker collection: {e}")
             raise
     
-    def get_max_chunkno_by_md5(self, md5_hash: str, collection_name: str = None) -> int:
-        """
-        Get the maximum chunk number for a document by MD5 hash.
-        This gives you the total number of chunks for that document.
-        
-        Args:
-            md5_hash: MD5 hash of the document
-            collection_name: Optional collection name (defaults to cloud collection)
-            
-        Returns:
-            Maximum chunk number (integer), or 0 if document not found
-        """
-        try:
-            if collection_name is None:
-                collection_name = self.cloud_collection
-            
-            # Scroll through all points with this MD5 to find the maximum chunkno
-            results, _ = self.cloud_client.scroll(
-                collection_name=collection_name,
-                scroll_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="md5",
-                            match=MatchValue(value=md5_hash)
-                        )
-                    ]
-                ),
-                limit=1000,  # Adjust if you have more chunks per document
-                with_payload=True
-            )
-            
-            if not results:
-                app_logger.info(f"No document found with MD5: {md5_hash}")
-                return 0
-            
-            max_chunkno = 0
-            for point in results:
-                chunkno = point.payload.get("metadata", {}).get("chunkno", 0)
-                if isinstance(chunkno, int) and chunkno > max_chunkno:
-                    max_chunkno = chunkno
-            
-            app_logger.info(f"Document {md5_hash} has max chunkno: {max_chunkno}")
-            return max_chunkno
-            
-        except Exception as e:
-            error_logger.error(f"Failed to get max chunkno for MD5 {md5_hash}: {e}")
-            return 0
-    
-    def get_point_by_md5_and_chunkno(self, md5_hash: str, chunkno: int, collection_name: str = None) -> str:
-        """
-        Get the point UUID by filtering on MD5 and chunk number.
-        
-        Args:
-            md5_hash: MD5 hash of the document
-            chunkno: Chunk number (integer)
-            collection_name: Optional collection name (defaults to cloud collection)
-            
-        Returns:
-            Point UUID as string, or empty string if not found
-        """
-        try:
-            if collection_name is None:
-                collection_name = self.cloud_collection
-            
-            # Search for the specific point with MD5 and chunkno
-            results, _ = self.cloud_client.scroll(
-                collection_name=collection_name,
-                scroll_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="md5",
-                            match=MatchValue(value=md5_hash)
-                        ),
-                        FieldCondition(
-                            key="metadata.chunkno",
-                            match=MatchValue(value=chunkno)
-                        )
-                    ]
-                ),
-                limit=1,
-                with_payload=True
-            )
-            
-            if results:
-                point_id = str(results[0].id)
-                app_logger.info(f"Found point {point_id} for MD5 {md5_hash}, chunkno {chunkno}")
-                return point_id
-            else:
-                app_logger.info(f"No point found for MD5 {md5_hash}, chunkno {chunkno}")
-                return ""
-                
-        except Exception as e:
-            error_logger.error(f"Failed to get point by MD5 and chunkno: {e}")
-            return ""
-    
-    def decode_uuid7(self, uuid_string: str) -> datetime:
-        """
-        Decode a UUIDv7 (uuid_extensions format) to readable timestamp.
-        Tested with uuid7() from uuid_extensions package.
-        
-        Args:
-            uuid_string: UUID string to decode
-            
-        Returns:
-            datetime object in UTC timezone
-        """
-        try:
-            # Convert to bytes
-            if isinstance(uuid_string, str):
-                u = uuid.UUID(uuid_string).bytes
-            elif isinstance(uuid_string, uuid.UUID):
-                u = uuid_string.bytes
-            else:
-                u = uuid_string
-            
-            # Unpack UUID bytes
-            bits = struct.unpack(">IHHHHI", u)
-            
-            # Rebuild timestamp (same math as uuid_extensions.timestamp_ns)
-            whole_secs = (bits[0] << 16) | (bits[1] >> 16)
-            frac_secs = ((bits[1] & 0xFFFF) << 32) | (bits[2] << 16) | bits[3]
-            timestamp_ns = (whole_secs * 1_000_000_000) + (frac_secs * 1_000_000_000 // (1 << 48))
-            
-            # Convert nanoseconds to datetime
-            timestamp_sec = timestamp_ns / 1_000_000_000
-            dt = datetime.fromtimestamp(timestamp_sec, tz=timezone.utc)
-            
-            app_logger.info(f"Decoded UUID {uuid_string} to timestamp: {dt}")
-            return dt
-            
-        except Exception as e:
-            error_logger.error(f"Failed to decode UUID7 {uuid_string}: {e}")
-            raise
+    # ===================================================================
+    # Commented out utility functions as per requirements - not needed for now
+    # These functions can query documents by MD5 and chunkno, and decode UUIDv7 timestamps
+    # ===================================================================
+    #
+    # def get_max_chunkno_by_md5(self, md5_hash: str, collection_name: str = None) -> int:
+    #     """
+    #     Get the maximum chunk number for a document by MD5 hash.
+    #     This gives you the total number of chunks for that document.
+    #     
+    #     Args:
+    #         md5_hash: MD5 hash of the document
+    #         collection_name: Optional collection name (defaults to cloud collection)
+    #         
+    #     Returns:
+    #         Maximum chunk number (integer), or 0 if document not found
+    #     """
+    #     try:
+    #         if collection_name is None:
+    #             collection_name = self.cloud_collection
+    #         
+    #         # Scroll through all points with this MD5 to find the maximum chunkno
+    #         results, _ = self.cloud_client.scroll(
+    #             collection_name=collection_name,
+    #             scroll_filter=Filter(
+    #                 must=[
+    #                     FieldCondition(
+    #                         key="md5",
+    #                         match=MatchValue(value=md5_hash)
+    #                     )
+    #                 ]
+    #             ),
+    #             limit=1000,  # Adjust if you have more chunks per document
+    #             with_payload=True
+    #         )
+    #         
+    #         if not results:
+    #             app_logger.info(f"No document found with MD5: {md5_hash}")
+    #             return 0
+    #         
+    #         max_chunkno = 0
+    #         for point in results:
+    #             chunkno = point.payload.get("metadata", {}).get("chunkno", 0)
+    #             if isinstance(chunkno, int) and chunkno > max_chunkno:
+    #                 max_chunkno = chunkno
+    #         
+    #         app_logger.info(f"Document {md5_hash} has max chunkno: {max_chunkno}")
+    #         return max_chunkno
+    #         
+    #     except Exception as e:
+    #         error_logger.error(f"Failed to get max chunkno for MD5 {md5_hash}: {e}")
+    #         return 0
+    # 
+    # def get_point_by_md5_and_chunkno(self, md5_hash: str, chunkno: int, collection_name: str = None) -> str:
+    #     """
+    #     Get the point UUID by filtering on MD5 and chunk number.
+    #     
+    #     Args:
+    #         md5_hash: MD5 hash of the document
+    #         chunkno: Chunk number (integer)
+    #         collection_name: Optional collection name (defaults to cloud collection)
+    #         
+    #     Returns:
+    #         Point UUID as string, or empty string if not found
+    #     """
+    #     try:
+    #         if collection_name is None:
+    #             collection_name = self.cloud_collection
+    #         
+    #         # Search for the specific point with MD5 and chunkno
+    #         results, _ = self.cloud_client.scroll(
+    #             collection_name=collection_name,
+    #             scroll_filter=Filter(
+    #                 must=[
+    #                     FieldCondition(
+    #                         key="md5",
+    #                         match=MatchValue(value=md5_hash)
+    #                     ),
+    #                     FieldCondition(
+    #                         key="metadata.chunkno",
+    #                         match=MatchValue(value=chunkno)
+    #                     )
+    #                 ]
+    #             ),
+    #             limit=1,
+    #             with_payload=True
+    #         )
+    #         
+    #         if results:
+    #             point_id = str(results[0].id)
+    #             app_logger.info(f"Found point {point_id} for MD5 {md5_hash}, chunkno {chunkno}")
+    #             return point_id
+    #         else:
+    #             app_logger.info(f"No point found for MD5 {md5_hash}, chunkno {chunkno}")
+    #             return ""
+    #             
+    #     except Exception as e:
+    #         error_logger.error(f"Failed to get point by MD5 and chunkno: {e}")
+    #         return ""
+    # 
+    # def decode_uuid7(self, uuid_string: str) -> datetime:
+    #     """
+    #     Decode a UUIDv7 (uuid_extensions format) to readable timestamp.
+    #     Uses the uuid_to_datetime function from uuid_extensions package.
+    #     
+    #     Args:
+    #         uuid_string: UUID string to decode
+    #         
+    #     Returns:
+    #         datetime object in UTC timezone
+    #     """
+    #     try:
+    #         # Convert to UUID object if needed
+    #         if isinstance(uuid_string, str):
+    #             u = uuid.UUID(uuid_string)
+    #         else:
+    #             u = uuid_string
+    #         
+    #         # Use uuid_extensions built-in function to decode
+    #         dt = uuid_to_datetime(u)
+    #         
+    #         app_logger.info(f"Decoded UUID {uuid_string} to timestamp: {dt}")
+    #         return dt
+    #         
+    #     except Exception as e:
+    #         error_logger.error(f"Failed to decode UUID7 {uuid_string}: {e}")
+    #         raise
