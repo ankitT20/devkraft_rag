@@ -21,7 +21,7 @@ from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
 from app.core.tts import TTSService
 from app.utils.logging_config import app_logger, error_logger
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -94,6 +94,34 @@ async def query(request: QueryRequest):
         
     except Exception as e:
         error_logger.error(f"Query endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/query-stream")
+async def query_stream(request: QueryRequest):
+    """
+    Process a RAG query with streaming response.
+    
+    Args:
+        request: Query request with user query and model type
+        
+    Returns:
+        Server-Sent Events stream with response chunks
+    """
+    try:
+        app_logger.info(f"Received streaming query request: model_type={request.model_type}")
+        
+        return StreamingResponse(
+            rag_service.query_stream(
+                user_query=request.query,
+                model_type=request.model_type,
+                chat_id=request.chat_id
+            ),
+            media_type="text/event-stream"
+        )
+        
+    except Exception as e:
+        error_logger.error(f"Streaming query endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

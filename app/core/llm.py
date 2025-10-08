@@ -120,7 +120,7 @@ CONTEXT: {context}
 
 QUESTION: {query}
 
-ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by ONLY the document numbers you actually used in your answer, comma-separated, in order of relevance. If you did not use any documents or they were not relevant, write "SOURCES: 0")"""
+ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by ONLY the document numbers you actually used in your answer. You can ONLY use numbers from 1 to 4 since only 4 documents are provided above. Format: "SOURCES: 1, 2" or "SOURCES: 1, 3, 4". If you did not use any documents or they were not relevant, write "SOURCES: 0")"""
         return prompt
     
     def _extract_source_indices(self, response: str) -> List[int]:
@@ -144,6 +144,78 @@ ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed 
         # Remove the entire SOURCES line
         cleaned = re.sub(r'\n*SOURCES:\s*[0-9,\s]+\s*$', '', response, flags=re.IGNORECASE)
         return cleaned.strip()
+    
+    def generate_response_with_sources_stream(self, query: str, context: str, chat_history: List[Dict[str, str]] = None):
+        """
+        Generate streaming response using Gemini with source tracking.
+        
+        Args:
+            query: User query
+            context: Retrieved context from RAG
+            chat_history: Optional chat history
+            
+        Yields:
+            Chunks of response text as they are generated
+        """
+        try:
+            app_logger.info("Generating streaming Gemini response with source tracking")
+            
+            # Build the prompt
+            prompt = self._build_prompt_with_sources(query, context)
+            
+            # Build contents with history
+            contents = []
+            if chat_history:
+                for msg in chat_history[-5:]:  # Last 5 messages for context
+                    role = "user" if msg["role"] == "user" else "model"
+                    contents.append(types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=msg["content"])]
+                    ))
+            
+            # Add current query
+            contents.append(types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            ))
+            
+            # Generate streaming response
+            full_response = ""
+            import re
+            sources_pattern = re.compile(r'\n*SOURCES:\s*[0-9,\s]+', re.IGNORECASE)
+            
+            for chunk in self.client.models.generate_content_stream(
+                model=self.model,
+                contents=contents
+            ):
+                if chunk.text:
+                    full_response += chunk.text
+                    
+                    # Check if this chunk or accumulated response contains SOURCES line
+                    # If so, only yield the part before SOURCES
+                    if sources_pattern.search(full_response):
+                        # Extract the part before SOURCES line
+                        clean_part = sources_pattern.split(full_response)[0]
+                        # Calculate what we haven't yielded yet
+                        already_yielded_len = len(full_response) - len(chunk.text)
+                        remaining = clean_part[already_yielded_len:]
+                        if remaining:
+                            yield remaining
+                        break  # Stop yielding after SOURCES line
+                    else:
+                        yield chunk.text
+            
+            # Extract sources from full response
+            sources = self._extract_source_indices(full_response)
+            
+            app_logger.info(f"Successfully generated streaming Gemini response with sources: {sources}")
+            
+            # Yield final metadata as a special marker
+            yield f"\n__SOURCES__:{','.join(map(str, sources))}"
+            
+        except Exception as e:
+            error_logger.error(f"Failed to generate streaming Gemini response: {e}")
+            raise
 
 
 class LocalLLM:
@@ -327,7 +399,7 @@ CONTEXT: {context}
 
 QUESTION: {query}
 
-ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by ONLY the document numbers you actually used in your answer, comma-separated, in order of relevance. If you did not use any documents or they were not relevant, write "SOURCES: 0")"""
+ANSWER: (First provide your answer, then on a new line add "SOURCES: " followed by ONLY the document numbers you actually used in your answer. You can ONLY use numbers from 1 to 4 since only 4 documents are provided above. Format: "SOURCES: 1, 2" or "SOURCES: 1, 3, 4". If you did not use any documents or they were not relevant, write "SOURCES: 0")"""
         return prompt
     
     def _extract_source_indices(self, response: str) -> List[int]:
