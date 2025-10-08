@@ -18,7 +18,7 @@ class SourceInfo(BaseModel):
     page: int = Field(..., description="Page number")
     filename: str = Field(..., description="Source filename")
     text: str = Field(..., description="Original source text")
-    chunkno: str = Field(..., description="Chunk number")
+    chunkno: int = Field(..., description="Chunk number")
 
 
 class QueryResponse(BaseModel):

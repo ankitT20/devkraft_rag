@@ -69,7 +69,7 @@ class IngestionService:
                     **base_metadata,
                     "page": page_meta["page"],
                     "header": page_meta["header"],
-                    "chunkno": f"{i+1:05d}"  # Format as 00001, 00002, etc.
+                    "chunkno": i + 1  # Integer chunk number starting from 1
                 }
                 chunk_metadata.append(chunk_meta)
             

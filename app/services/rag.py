@@ -161,7 +161,7 @@ class RAGService:
                     "page": metadata.get("page", 1),
                     "filename": metadata.get("filename", "Unknown"),
                     "text": result.get("text", ""),
-                    "chunkno": metadata.get("chunkno", "00001")
+                    "chunkno": metadata.get("chunkno", 1)
                 }
                 sources.append(source)
         
