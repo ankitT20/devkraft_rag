@@ -1,6 +1,7 @@
 @startuml DevKraft_RAG_Architecture
 skinparam backgroundColor #FEFEFE
 skinparam componentStyle rectangle
+skinparam linetype ortho
 
 ' Entry Points
 package "Entry Points" #E8F5E9 {
