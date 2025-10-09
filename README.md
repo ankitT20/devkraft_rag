@@ -153,30 +153,61 @@ Choose between two models in the sidebar dropdown:
 4. For Qwen3 model, expand "Show Thinking" to see reasoning
 5. Click "🔊 Listen" button to hear the response in audio
 
-### Live Voice Interaction
+### Live Voice Interaction - Continuous Phone Call Experience
 
-Experience real-time voice conversation like a phone call or meeting:
+Experience real-time voice conversation like an actual phone call with Voice Activity Detection:
 
-1. Click **"🎤 Talk (English)"** or **"🎤 Talk (Hindi)"** button in the top bar
-2. A Live API interface will appear
-3. Click "Start Session" to initialize the voice interaction
-4. **Voice Input**: Click the microphone button to record your voice (browser will ask for microphone permission)
-5. **Text Input**: Or type your message in the text input box
-6. Get instant audio responses with text transcription
-7. Continue the conversation - full context is maintained
+**🖥️ Desktop Audio Client (Recommended):**
+
+For the full continuous voice experience, use the desktop client:
+
+```bash
+# English (India)
+python live_audio_client.py --language en-IN
+
+# Hindi (India)
+python live_audio_client.py --language hi-IN
+```
+
+**Features:**
+- 🎤 **Continuous Voice Streaming**: No clicking needed - just speak naturally
+- 🔊 **Voice Activity Detection (VAD)**: Automatically detects when you're speaking
+- 💬 **Affective Dialog**: Natural emotional responses
+- 🔄 **Turn Coverage**: Better conversation flow
+- 📝 **Real-time Transcription**: See what you said and AI's responses
+- ⚡ **Low Latency**: Instant audio responses via pyaudio
+
+**How it works:**
+1. Run the command above
+2. Speak naturally - VAD automatically detects your voice
+3. AI responds with voice and text immediately
+4. Continue conversation without clicking anything
+5. Press Ctrl+C to exit
 
 **Supported Languages:**
 - English (India) - en-IN
 - Hindi (India) - hi-IN
 
-**Features:**
-- 🎤 **Browser Microphone Input**: Record voice messages directly in the browser
-- 🔊 **Real-time Audio Output**: Instant audio responses with natural voices
-- 💬 **Conversation History**: See full conversation with text transcription
-- 🔄 **Continuous Chat**: Context-aware responses like a real conversation
-- 📝 **Text Display**: Both input and output text are displayed
+**🌐 Web UI Alternative:**
 
-**Note:** The Live API uses Gemini's native audio preview model (gemini-2.5-flash-native-audio-preview-09-2025) which automatically selects the appropriate voice for the language.
+For text-based interaction through Streamlit:
+1. Click **"🎤 Talk (English)"** or **"🎤 Talk (Hindi)"** button
+2. Type your message and get audio responses
+3. Note: Browser limitations prevent continuous audio streaming
+
+**Technical Details:**
+- Model: gemini-2.5-flash-native-audio-preview-09-2025
+- Voice Activity Detection (VAD) enabled
+- Affective dialog for natural conversation
+- Turn coverage for smooth interactions
+- Thinking mode disabled for faster responses
+- Direct pyaudio streaming (desktop client)
+
+**Why Desktop Client?**
+- Browser/Streamlit cannot do continuous bidirectional audio streaming
+- Desktop client provides true phone call experience
+- Direct microphone and speaker access via pyaudio
+- Proper implementation of Gemini Live API specifications
 
 ### Chat History
 
@@ -201,7 +232,10 @@ Experience real-time voice conversation like a phone call or meeting:
 ### Live API Endpoints
 - `POST /live/start-session` - Start a Live API session with language selection
 - `POST /live/send-text` - Send text to Live API and get audio response
-- `POST /live/send-audio` - Send audio from microphone and get audio response with transcription
+- `GET /live/session-info` - Get information about an active session
+
+### Desktop Audio Client
+- `live_audio_client.py` - Standalone client for continuous voice conversation with VAD
 
 Visit http://localhost:8000/docs for interactive API documentation.
 

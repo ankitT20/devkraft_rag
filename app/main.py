@@ -317,93 +317,33 @@ async def start_live_session(request: LiveSessionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/live/send-audio")
-async def send_audio_to_live(audio: UploadFile = File(...), language: str = "en-IN"):
+@app.get("/live/session-info")
+async def get_live_session_info(session_id: str):
     """
-    Send audio to Live API session and get response.
+    Get information about an active Live API session.
     
     Args:
-        audio: Audio file from microphone
-        language: Language code
+        session_id: Session ID
         
     Returns:
-        Audio response in WAV format
+        Session information
     """
     try:
-        app_logger.info(f"Receiving audio input for Live API (language: {language})")
-        
-        # Read audio file
-        audio_data = await audio.read()
-        
-        # Create a Live API session
-        async with live_api_service.client.aio.live.connect(
-            model=live_api_service.model,
-            config=live_api_service.get_config(language)
-        ) as session:
-            # Send audio data to Live API
-            await session.send(input={"data": audio_data, "mime_type": "audio/wav"})
-            
-            # Collect response
-            response_text = ""
-            audio_response = b""
-            transcription = ""
-            
-            turn = session.receive()
-            async for response in turn:
-                if response.data:
-                    audio_response += response.data
-                if response.text:
-                    response_text += response.text
-                    if not transcription:
-                        transcription = "Voice input received"
-            
-            app_logger.info(f"Received audio response: {len(audio_response)} bytes, text: {response_text[:100]}...")
-            
-            if audio_response:
-                # Convert raw PCM audio to WAV format
-                import struct
-                sample_rate = 24000
-                num_channels = 1
-                bits_per_sample = 16
-                data_size = len(audio_response)
-                bytes_per_sample = bits_per_sample // 8
-                block_align = num_channels * bytes_per_sample
-                byte_rate = sample_rate * block_align
-                chunk_size = 36 + data_size
-                
-                wav_header = struct.pack(
-                    "<4sI4s4sIHHIIHH4sI",
-                    b"RIFF",
-                    chunk_size,
-                    b"WAVE",
-                    b"fmt ",
-                    16,
-                    1,
-                    num_channels,
-                    sample_rate,
-                    byte_rate,
-                    block_align,
-                    bits_per_sample,
-                    b"data",
-                    data_size
-                )
-                
-                wav_data = wav_header + audio_response
-                
-                return Response(
-                    content=wav_data,
-                    media_type="audio/wav",
-                    headers={
-                        "X-Response-Text": response_text,
-                        "X-Transcription": transcription,
-                        "Content-Disposition": "attachment; filename=response.wav"
-                    }
-                )
-            else:
-                raise HTTPException(status_code=500, detail="No audio response received")
-        
+        session_data = live_api_service.get_session(session_id)
+        if session_data:
+            return {
+                "status": "active",
+                "session_id": session_id,
+                "language": session_data.get("language", "en-IN"),
+                "created_at": session_data.get("created_at"),
+                "message": "Session is active. Use WebSocket or external client for audio streaming."
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+    except HTTPException:
+        raise
     except Exception as e:
-        error_logger.error(f"Failed to process audio input: {e}")
+        error_logger.error(f"Failed to get session info: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

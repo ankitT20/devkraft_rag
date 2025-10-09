@@ -1,6 +1,6 @@
 """
 Gemini Live API service for real-time voice interaction.
-Based on the official Gemini Live API quickstart.
+Based on the official Gemini Live API quickstart with continuous streaming.
 """
 import asyncio
 import os
@@ -26,7 +26,7 @@ _active_sessions: Dict[str, dict] = {}
 
 class LiveAPIService:
     """
-    Gemini Live API service for real-time voice interaction.
+    Gemini Live API service for real-time voice interaction with continuous streaming.
     """
     
     def __init__(self):
@@ -40,7 +40,7 @@ class LiveAPIService:
     
     def get_config(self, language: str = "en-IN") -> types.LiveConnectConfig:
         """
-        Get Live API configuration.
+        Get Live API configuration with VAD, affective dialog, and turn coverage.
         
         Args:
             language: Language code (e.g., 'en-IN', 'hi-IN')
@@ -48,10 +48,6 @@ class LiveAPIService:
         Returns:
             LiveConnectConfig with audio settings
         """
-        # Note: According to the docs, native audio output models automatically 
-        # choose the appropriate language and don't support explicitly setting 
-        # the language code. So we'll add it to the system instruction instead.
-        
         system_instruction = f"""You are a helpful AI assistant. 
 Please respond in {self._get_language_name(language)} language.
 Be conversational and natural in your responses."""
@@ -66,6 +62,18 @@ Be conversational and natural in your responses."""
                     )
                 )
             ),
+            # Enable Voice Activity Detection for continuous conversation
+            voice_activity_detection=types.VoiceActivityDetectionConfig(
+                enabled=True
+            ),
+            # Enable affective dialog for natural conversation
+            affective_dialog=types.AffectiveDialogConfig(
+                enabled=True
+            ),
+            # Enable turn coverage for better conversation flow
+            turn_coverage=types.TurnCoverageConfig(
+                enabled=True
+            ),
             context_window_compression=types.ContextWindowCompressionConfig(
                 trigger_tokens=25600,
                 sliding_window=types.SlidingWindow(target_tokens=12800),
@@ -73,7 +81,7 @@ Be conversational and natural in your responses."""
             system_instruction=system_instruction
         )
         
-        app_logger.info(f"Created Live API config for language: {language}")
+        app_logger.info(f"Created Live API config for language: {language} with VAD, affective dialog, and turn coverage")
         return config
     
     def _get_language_name(self, language_code: str) -> str:

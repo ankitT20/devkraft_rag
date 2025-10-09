@@ -355,127 +355,89 @@ def main():
         st.markdown("---")
         st.subheader(f"🎤 Live Voice Interaction ({st.session_state.live_language})")
         
-        # Initialize conversation history for live session
-        if "live_conversation" not in st.session_state:
-            st.session_state.live_conversation = []
+        st.warning("""
+        **⚠️ Note: Continuous Voice Conversation Requires Desktop Client**
+        
+        For a true phone call experience with Voice Activity Detection (VAD), you need to use the 
+        desktop audio client which provides:
+        - **Continuous streaming** - No clicking needed
+        - **Voice Activity Detection** - Automatically detects when you're speaking
+        - **Real-time conversation** - Like a phone call or meeting
+        - **Low latency** - Instant audio responses
+        """)
         
         st.info("""
-        **Live API Voice Interaction**
+        **🖥️ To Start Desktop Voice Client:**
         
-        This feature enables real-time voice conversation with AI like a phone call.
+        1. Open a terminal in the project directory
+        2. Run one of these commands:
         
-        **How to use:**
-        1. Click "Start Session" to initialize the connection
-        2. Type your message in the text box or use microphone (audio input)
-        3. Get instant audio responses with text transcription
-        4. Continue the conversation - context is maintained
+        **English (India):**
+        ```bash
+        python live_audio_client.py --language en-IN
+        ```
         
-        **Note:** This uses browser microphone for audio input and plays audio responses automatically.
+        **Hindi (India):**
+        ```bash
+        python live_audio_client.py --language hi-IN
+        ```
+        
+        3. Just speak naturally - Voice Activity Detection (VAD) will handle turn-taking
+        4. No clicking needed - it works like a phone call!
+        5. Press Ctrl+C to exit
+        
+        **Features:**
+        - ✅ Voice Activity Detection (VAD)
+        - ✅ Affective Dialog (natural emotional responses)
+        - ✅ Turn Coverage (better conversation flow)
+        - ✅ Continuous audio streaming with pyaudio
+        - ✅ No browser limitations
         """)
         
         col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("✅ Start Session", key="start_live_session"):
-                with st.spinner("Starting Live API session..."):
+            if st.button("✅ Check Session", key="start_live_session"):
+                with st.spinner("Checking Live API session..."):
                     try:
                         response = requests.post(
                             f"{API_URL}/live/start-session",
                             json={"language": st.session_state.live_language}
                         )
                         if response.status_code == 200:
-                            st.session_state.live_session_active = True
-                            st.session_state.live_conversation = []
-                            st.success("Live API session started! You can now talk with AI.")
+                            st.success("✓ Live API is ready! Use the desktop client for continuous voice.")
                         else:
-                            st.error("Failed to start session")
+                            st.error("Failed to connect to Live API")
                     except Exception as e:
                         st.error(f"Error: {e}")
         
         with col2:
             if st.button("❌ Close", key="close_live_modal"):
                 st.session_state.show_live_modal = False
-                st.session_state.live_session_active = False
-                st.session_state.live_conversation = []
                 st.rerun()
         
-        # Display conversation history
-        if st.session_state.live_conversation:
-            st.markdown("### 💬 Conversation History")
-            conversation_container = st.container()
-            with conversation_container:
-                for idx, msg in enumerate(st.session_state.live_conversation):
-                    if msg["role"] == "user":
-                        st.markdown(f"**👤 You:** {msg['text']}")
-                    else:
-                        st.markdown(f"**🤖 AI:** {msg['text']}")
-                        if msg.get("audio_played"):
-                            st.caption("🔊 Audio response played")
-                    if idx < len(st.session_state.live_conversation) - 1:
-                        st.markdown("---")
+        st.markdown("---")
+        st.markdown("### 💡 Why Desktop Client?")
+        st.markdown("""
+        **Browser Limitations:**
+        - ❌ Streamlit cannot do continuous audio streaming
+        - ❌ Browser-based recording requires clicking for each message
+        - ❌ High latency with file uploads
+        - ❌ No Voice Activity Detection in browser
         
-        # Audio input using browser microphone
-        st.markdown("### 🎙️ Voice Input (Browser Microphone)")
-        st.info("Click the button below to record your voice. Browser will ask for microphone permission.")
+        **Desktop Client Advantages:**
+        - ✅ Direct microphone/speaker access via pyaudio
+        - ✅ Continuous bidirectional audio streaming
+        - ✅ Voice Activity Detection (VAD) built-in
+        - ✅ Low latency real-time conversation
+        - ✅ Proper implementation of Gemini Live API
         
-        try:
-            from audio_recorder_streamlit import audio_recorder
-            
-            audio_bytes = audio_recorder(
-                text="Click to record",
-                recording_color="#ff4b4b",
-                neutral_color="#6c757d",
-                icon_name="microphone",
-                icon_size="2x",
-                pause_threshold=2.0,
-                sample_rate=16000
-            )
-            
-            if audio_bytes:
-                st.success("Audio recorded! Processing...")
-                
-                with st.spinner("🔄 Sending audio to Live API..."):
-                    try:
-                        # Send audio to backend
-                        files = {"audio": ("recording.wav", audio_bytes, "audio/wav")}
-                        data = {"language": st.session_state.live_language}
-                        
-                        response = requests.post(
-                            f"{API_URL}/live/send-audio",
-                            files=files,
-                            data=data
-                        )
-                        
-                        if response.status_code == 200:
-                            # Get transcription and response
-                            response_text = response.headers.get("X-Response-Text", "Response received")
-                            transcription = response.headers.get("X-Transcription", "Audio recorded")
-                            
-                            # Add to conversation
-                            st.session_state.live_conversation.append({
-                                "role": "user",
-                                "text": f"🎤 {transcription}"
-                            })
-                            
-                            st.session_state.live_conversation.append({
-                                "role": "assistant",
-                                "text": response_text,
-                                "audio_played": True
-                            })
-                            
-                            # Play audio response
-                            st.audio(response.content, format="audio/wav", autoplay=True)
-                            st.success("✅ Voice message processed! Audio response playing.")
-                            st.rerun()
-                        else:
-                            st.error("Failed to process audio")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+        The desktop client (`live_audio_client.py`) provides the full phone call experience 
+        as intended by the Gemini Live API.
+        """)
         
-        except ImportError:
-            st.warning("⚠️ Audio recorder component not installed. Using text input only.")
-            st.info("To enable voice input, install: `pip install audio-recorder-streamlit`")
+        st.markdown("### ⌨️ Text Input (Alternative)")
+        st.caption("For text-based interaction without continuous audio:")
         
-        st.markdown("### ⌨️ Text Input")
         # Text input for Live API
         live_prompt = st.text_input(
             "Type your message:",
@@ -487,12 +449,6 @@ def main():
             if live_prompt:
                 with st.spinner("🔄 Sending to Live API and getting response..."):
                     try:
-                        # Add user message to conversation
-                        st.session_state.live_conversation.append({
-                            "role": "user",
-                            "text": live_prompt
-                        })
-                        
                         response = requests.post(
                             f"{API_URL}/live/send-text",
                             json={
@@ -504,17 +460,10 @@ def main():
                             # Get response text from headers if present
                             response_text = response.headers.get("X-Response-Text", "Response received")
                             
-                            # Add AI response to conversation
-                            st.session_state.live_conversation.append({
-                                "role": "assistant",
-                                "text": response_text,
-                                "audio_played": True
-                            })
+                            st.success(f"**🤖 AI Response:** {response_text}")
                             
                             # Play audio response
                             st.audio(response.content, format="audio/wav", autoplay=True)
-                            st.success("✅ Response received! Audio is playing.")
-                            st.rerun()
                         else:
                             st.error("Failed to send message")
                     except Exception as e:
