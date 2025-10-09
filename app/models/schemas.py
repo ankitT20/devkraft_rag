@@ -49,3 +49,23 @@ class HealthResponse(BaseModel):
     """Response model for health check."""
     status: str = Field(..., description="Service status")
     message: str = Field(..., description="Status message")
+
+
+class LiveSessionRequest(BaseModel):
+    """Request model for Live API session."""
+    language: str = Field(default="en-IN", description="Language code (e.g., 'en-IN', 'hi-IN')")
+
+
+class LiveSessionResponse(BaseModel):
+    """Response model for Live API session."""
+    session_id: str = Field(..., description="Session ID")
+    status: str = Field(..., description="Session status")
+    language: str = Field(..., description="Language code")
+    message: str = Field(..., description="Status message")
+
+
+class LiveTextRequest(BaseModel):
+    """Request model for Live API text input."""
+    text: str = Field(..., description="Text to send", min_length=1)
+    language: str = Field(default="en-IN", description="Language code")
+    session_id: Optional[str] = Field(None, description="Session ID for context")

@@ -15,7 +15,10 @@ from app.models.schemas import (
     IngestionResponse, 
     ChatHistoryItem,
     HealthResponse,
-    SourceInfo
+    SourceInfo,
+    LiveSessionRequest,
+    LiveSessionResponse,
+    LiveTextRequest
 )
 from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
@@ -278,28 +281,36 @@ async def text_to_speech(request: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/live/start-session")
-async def start_live_session(request: dict):
+@app.post("/live/start-session", response_model=LiveSessionResponse)
+async def start_live_session(request: LiveSessionRequest):
     """
     Start a Live API session.
     
     Args:
-        request: Dictionary with 'language' field (e.g., 'en-IN', 'hi-IN')
+        request: Live API session request with language
         
     Returns:
         Session ID and status
     """
     try:
-        language = request.get("language", "en-IN")
-        app_logger.info(f"Starting Live API session for language: {language}")
+        app_logger.info(f"Starting Live API session for language: {request.language}")
         
-        # For now, return a placeholder response
-        # The actual session management will be handled in the Streamlit UI
-        return {
-            "status": "ready",
-            "language": language,
-            "message": "Live API is ready for connection"
-        }
+        # Create a new session ID
+        session_id = live_api_service.create_session_id()
+        
+        # Store session metadata
+        live_api_service.store_session(session_id, {
+            "language": request.language,
+            "created_at": None,  # Will be set when actual session is created
+            "status": "initialized"
+        })
+        
+        return LiveSessionResponse(
+            session_id=session_id,
+            status="ready",
+            language=request.language,
+            message=f"Live API session initialized for {request.language}"
+        )
         
     except Exception as e:
         error_logger.error(f"Failed to start Live API session: {e}")
@@ -307,35 +318,49 @@ async def start_live_session(request: dict):
 
 
 @app.post("/live/send-text")
-async def send_text_to_live(request: dict):
+async def send_text_to_live(request: LiveTextRequest):
     """
-    Send text to Live API session.
+    Send text to Live API session and get response.
     
     Args:
-        request: Dictionary with 'text' and 'language' fields
+        request: Live API text request
         
     Returns:
-        Status and response
+        Text response and audio URL
     """
     try:
-        text = request.get("text", "")
-        language = request.get("language", "en-IN")
+        app_logger.info(f"Sending text to Live API: {request.text[:50]}... (language: {request.language})")
         
-        if not text:
-            raise HTTPException(status_code=400, detail="Text field is required")
+        # Create a temporary session for this request
+        # In production, this would use an existing session or WebSocket
+        async with live_api_service.client.aio.live.connect(
+            model=live_api_service.model,
+            config=live_api_service.get_config(request.language)
+        ) as session:
+            # Send text
+            await live_api_service.send_text(session, request.text)
+            
+            # Collect response
+            response_text = ""
+            audio_chunks = []
+            
+            turn = session.receive()
+            async for response in turn:
+                if response.data:
+                    audio_chunks.append(response.data)
+                if response.text:
+                    response_text += response.text
+            
+            app_logger.info(f"Received response: {response_text[:100]}...")
+            
+            return {
+                "status": "success",
+                "text": response_text,
+                "has_audio": len(audio_chunks) > 0,
+                "audio_chunks": len(audio_chunks),
+                "message": "Text sent and response received"
+            }
         
-        app_logger.info(f"Sending text to Live API: {text[:50]}... (language: {language})")
-        
-        # For now, return a placeholder response
-        # The actual implementation will be handled via WebSocket or streaming
-        return {
-            "status": "sent",
-            "text": text,
-            "language": language
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
         error_logger.error(f"Failed to send text to Live API: {e}")
         raise HTTPException(status_code=500, detail=str(e))

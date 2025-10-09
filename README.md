@@ -5,11 +5,13 @@ A simple Retrieval-Augmented Generation (RAG) system with a Streamlit UI, FastAP
 ## Features
 
 - 🤖 **Dual Model Support**: Choose between Gemini Cloud (gemini-2.5-flash) or Local LMStudio/HF (qwen3-1.7b)
+- 🎤 **Live Voice Interaction**: Real-time voice conversation using Gemini Live API with support for English (India) and Hindi (India)
 - 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD)
 - 💾 **Vector Storage**: Dual storage with Qdrant Cloud and Docker
 - 💬 **Chat History**: Persistent chat sessions stored in MongoDB Atlas (with JSON file fallback)
 - 🧠 **Thinking Display**: View model reasoning process (qwen3)
 - 🔍 **RAG Pipeline**: Semantic search and context-aware responses
+- 🔊 **Text-to-Speech**: Convert responses to audio using Gemini TTS
 
 ## Project Structure
 
@@ -20,7 +22,9 @@ devkraft_rag/
 │   │   ├── embeddings.py  # Embedding services (Gemini, Local/HF)
 │   │   ├── llm.py         # LLM services (Gemini, Local/HF)
 │   │   ├── storage.py     # Qdrant vector storage
-│   │   └── chat_storage.py # MongoDB chat history storage
+│   │   ├── chat_storage.py # MongoDB chat history storage
+│   │   ├── tts.py         # Text-to-speech service
+│   │   └── live_api.py    # Gemini Live API service
 │   ├── services/          # Business logic
 │   │   ├── document_processor.py  # Document loading and chunking
 │   │   ├── ingestion.py   # Document ingestion pipeline
@@ -147,6 +151,21 @@ Choose between two models in the sidebar dropdown:
 2. Press Enter to send
 3. View the AI response
 4. For Qwen3 model, expand "Show Thinking" to see reasoning
+5. Click "🔊 Listen" button to hear the response in audio
+
+### Live Voice Interaction
+
+1. Click **"🎤 Talk (English)"** or **"🎤 Talk (Hindi)"** button in the top bar
+2. A Live API interface will appear
+3. Click "Start Session" to initialize the voice interaction
+4. Type your message in the text input
+5. Click "Send" to get real-time audio response
+
+**Supported Languages:**
+- English (India) - en-IN
+- Hindi (India) - hi-IN
+
+**Note:** The Live API uses Gemini's native audio preview model (gemini-2.5-flash-native-audio-preview-09-2025) which automatically selects the appropriate voice for the language.
 
 ### Chat History
 
@@ -156,12 +175,21 @@ Choose between two models in the sidebar dropdown:
 
 ## API Endpoints
 
+### Core Endpoints
 - `GET /` - Health check
 - `POST /query` - Process RAG query
+- `POST /query-stream` - Process RAG query with streaming response
 - `POST /upload` - Upload and ingest document
 - `POST /ingest-all` - Ingest all documents in folder
 - `GET /chats` - Get recent chat sessions
 - `GET /chat/{chat_id}` - Get full chat history
+
+### Audio Endpoints
+- `POST /tts` - Convert text to speech (WAV format)
+
+### Live API Endpoints
+- `POST /live/start-session` - Start a Live API session with language selection
+- `POST /live/send-text` - Send text to Live API and get audio response
 
 Visit http://localhost:8000/docs for interactive API documentation.
 

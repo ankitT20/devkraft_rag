@@ -4,7 +4,8 @@ Based on the official Gemini Live API quickstart.
 """
 import asyncio
 import os
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, Dict
+import uuid
 from google import genai
 from google.genai import types
 
@@ -17,6 +18,10 @@ CHANNELS = 1
 SEND_SAMPLE_RATE = 16000
 RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE = 1024
+
+
+# Global session storage (in production, use Redis or similar)
+_active_sessions: Dict[str, dict] = {}
 
 
 class LiveAPIService:
@@ -160,3 +165,46 @@ Be conversational and natural in your responses."""
         except Exception as e:
             error_logger.error(f"Failed to receive audio: {e}")
             raise
+    
+    def create_session_id(self) -> str:
+        """
+        Create a unique session ID.
+        
+        Returns:
+            Unique session ID
+        """
+        return str(uuid.uuid4())
+    
+    def store_session(self, session_id: str, session_data: dict):
+        """
+        Store session data.
+        
+        Args:
+            session_id: Session ID
+            session_data: Session data to store
+        """
+        _active_sessions[session_id] = session_data
+        app_logger.info(f"Stored session: {session_id}")
+    
+    def get_session(self, session_id: str) -> Optional[dict]:
+        """
+        Get session data.
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Session data or None if not found
+        """
+        return _active_sessions.get(session_id)
+    
+    def remove_session(self, session_id: str):
+        """
+        Remove session data.
+        
+        Args:
+            session_id: Session ID
+        """
+        if session_id in _active_sessions:
+            del _active_sessions[session_id]
+            app_logger.info(f"Removed session: {session_id}")
