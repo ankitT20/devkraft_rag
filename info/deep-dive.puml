@@ -1,0 +1,734 @@
+@startuml DevKraft_RAG_Deep_Dive
+!theme cerulean-outline
+skinparam linetype ortho
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title DevKraft RAG - Deep Dive Architecture\nAll Classes, Functions, and Dependencies
+
+' ===================================================================
+' ENTRY POINTS
+' ===================================================================
+
+package "Entry Points" <<Rectangle>> #E8F5E9 {
+  
+  class streamlit_app.py {
+    ==Global Variables==
+    + API_URL: str = "http://localhost:8000"
+    + MODEL_INFO: dict
+    
+    ==Main Functions==
+    + main()
+    + init_session_state()
+    + upload_document(file) -> dict
+    + load_chat(chat_id: str)
+    + render_message(message: dict)
+    + render_sources(sources: list)
+  }
+  
+  class "app/main.py" as AppMain {
+    ==FastAPI App==
+    + app: FastAPI
+    
+    ==Service Instances==
+    + rag_service: RAGService
+    + ingestion_service: IngestionService
+    + tts_service: TTSService
+    
+    ==Endpoints==
+    + root() -> HealthResponse
+    + health() -> HealthResponse
+    + query(request: QueryRequest) -> QueryResponse
+    + query_stream(request: QueryRequest) -> StreamingResponse
+    + upload_document(file: UploadFile) -> IngestionResponse
+    + ingest_all() -> dict
+    + get_chats(limit: int) -> List[ChatHistoryItem]
+    + get_chat(chat_id: str) -> dict
+    + text_to_speech(request: dict) -> StreamingResponse
+  }
+  
+  class start.sh {
+    ==Shell Script==
+    Starts FastAPI and Streamlit
+  }
+}
+
+' ===================================================================
+' CONFIGURATION
+' ===================================================================
+
+package "Configuration" <<Rectangle>> #FFF9C4 {
+  
+  class "app/config.py::Settings" as Settings {
+    ==API Keys==
+    + gemini_api_key: str
+    + qdrant_api_key: str
+    + hf_token: str
+    
+    ==MongoDB Configuration==
+    + mongo_uri: str
+    + mongo_db_name: str = "devkraft_rag"
+    + mongo_collection_name: str = "chat_history"
+    
+    ==Qdrant Configuration==
+    + qdrant_cloud_url: str
+    + qdrant_docker_url: str = "http://localhost:6333"
+    + qdrant_cloud_collection: str = "bootcamp_rag_cloud"
+    + qdrant_docker_collection: str = "bootcamp_rag_docker"
+    
+    ==LM Studio Configuration==
+    + lmstudio_url: str = "http://127.0.0.1:1234"
+    
+    ==Model Configuration==
+    + gemini_embedding_model: str = "gemini-embedding-001"
+    + gemini_chat_model: str = "gemini-2.5-flash"
+    + gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
+    + local_embedding_model: str
+    + local_chat_model: str = "qwen/qwen3-1.7b"
+    + hf_embedding_model: str = "google/embeddinggemma-300m"
+    + hf_chat_model: str = "Qwen/Qwen3-1.7B"
+    
+    ==Vector Dimensions==
+    + gemini_embedding_dim: int = 3072
+    + local_embedding_dim: int = 768
+    
+    ==Chunking Configuration==
+    + chunk_size: int = 2000
+    + chunk_overlap: int = 400
+    
+    ==Paths==
+    + generate_embeddings_folder: str
+    + stored_folder: str
+    + stored_docker_only_folder: str
+    + stored_cloud_only_folder: str
+    + user_chat_folder: str
+    + logs_folder: str
+    
+    ==Config==
+    + Config.env_file = ".env"
+    + Config.case_sensitive = False
+  }
+  
+  class ".env" as EnvFile {
+    Environment variables file
+  }
+  
+  note bottom of Settings
+    Singleton instance: settings
+    Used by all modules
+  end note
+}
+
+' ===================================================================
+' CORE SERVICES - EMBEDDINGS
+' ===================================================================
+
+package "Core Services - Embeddings" <<Rectangle>> #E3F2FD {
+  
+  class "app/core/embeddings.py::GeminiEmbedding" as GeminiEmbedding {
+    ==Attributes==
+    + client: genai.Client
+    + model: str
+    + api_call_count: int
+    
+    ==Methods==
+    + __init__()
+    + embed_documents(texts: List[str]) -> List[List[float]]
+    + embed_query(text: str) -> List[float]
+    
+    ==Notes==
+    - Output: 3072 dimensions
+    - Already normalized by API
+    - Rate limiting: 10s delay every 50 calls
+    - Uses RETRIEVAL_DOCUMENT task type
+    - Uses RETRIEVAL_QUERY task type
+  }
+  
+  class "app/core/embeddings.py::LocalEmbedding" as LocalEmbedding {
+    ==Attributes==
+    + lmstudio_url: str
+    + local_model: str
+    + hf_model: str
+    + use_fallback: bool
+    + hf_client: InferenceClient (optional)
+    
+    ==Public Methods==
+    + __init__()
+    + embed_documents(texts: List[str]) -> List[List[float]]
+    + embed_query(text: str) -> List[float]
+    
+    ==Private Methods==
+    - _test_lmstudio() -> bool
+    - _normalize_embedding(embedding: List[float]) -> List[float]
+    - _embed_with_lmstudio(text: str) -> List[float]
+    - _embed_with_hf(text: str) -> List[float]
+    
+    ==Notes==
+    - Output: 768 dimensions
+    - Requires normalization
+    - LM Studio primary, HF fallback
+    - Tests LM Studio availability on init
+  }
+}
+
+' ===================================================================
+' CORE SERVICES - LLM
+' ===================================================================
+
+package "Core Services - LLM" <<Rectangle>> #E3F2FD {
+  
+  class "app/core/llm.py::GeminiLLM" as GeminiLLM {
+    ==Attributes==
+    + client: genai.Client
+    + model: str
+    
+    ==Public Methods==
+    + __init__()
+    + generate_response(query, context, chat_history) -> str
+    + generate_response_with_sources(query, context, chat_history) -> Tuple[str, List[int]]
+    + generate_response_with_sources_stream(query, context, chat_history) -> Generator
+    
+    ==Private Methods==
+    - _build_prompt(query: str, context: str) -> str
+    - _build_prompt_with_sources(query: str, context: str) -> str
+    - _extract_source_indices(response: str) -> List[int]
+    - _remove_sources_line(response: str) -> str
+    
+    ==Notes==
+    - Model: gemini-2.5-flash
+    - Supports streaming responses
+    - Tracks which documents were used
+    - Extracts sources from "SOURCES: 1, 2, 3" pattern
+  }
+  
+  class "app/core/llm.py::LocalLLM" as LocalLLM {
+    ==Attributes==
+    + lmstudio_url: str
+    + local_model: str
+    + hf_model: str
+    + use_fallback: bool
+    + hf_client: InferenceClient (optional)
+    
+    ==Public Methods==
+    + __init__()
+    + generate_response(query, context, chat_history) -> Tuple[str, Optional[str]]
+    + generate_response_with_sources(query, context, chat_history) -> Tuple[str, Optional[str], List[int]]
+    
+    ==Private Methods==
+    - _test_lmstudio() -> bool
+    - _generate_with_lmstudio(query, context, chat_history) -> Tuple[str, Optional[str], List[int]]
+    - _generate_with_hf(query, context, chat_history) -> Tuple[str, Optional[str], List[int]]
+    - _build_prompt(query: str, context: str) -> str
+    - _build_prompt_with_sources(query: str, context: str) -> str
+    - _extract_source_indices(response: str) -> List[int]
+    - _remove_sources_line(response: str) -> str
+    - _extract_thinking(response: str) -> Tuple[str, Optional[str]]
+    
+    ==Notes==
+    - Model: qwen3-1.7b
+    - Supports thinking blocks <think>...</think>
+    - LM Studio primary, HF fallback
+    - Uses featherless-ai provider for HF
+  }
+}
+
+' ===================================================================
+' CORE SERVICES - STORAGE
+' ===================================================================
+
+package "Core Services - Storage" <<Rectangle>> #E3F2FD {
+  
+  class "app/core/storage.py::QdrantStorage" as QdrantStorage {
+    ==Attributes==
+    + cloud_client: QdrantClient
+    + docker_client: QdrantClient (optional)
+    + cloud_collection: str = "bootcamp_rag_cloud"
+    + cloud_docker_collection: str = "bootcamp_rag_docker"
+    + docker_collection: str = "bootcamp_rag_docker"
+    + docker_available: bool
+    
+    ==Public Methods==
+    + __init__()
+    + check_document_exists(md5_hash: str, collection_name: str) -> bool
+    + store_embeddings_cloud(embeddings, texts, metadata, md5_hash) -> bool
+    + store_embeddings_docker(embeddings, texts, metadata, md5_hash) -> bool
+    + search_cloud(query_vector: List[float], limit: int) -> List[Dict]
+    + search_docker(query_vector: List[float], limit: int) -> List[Dict]
+    
+    ==Private Methods==
+    - _ensure_collection(client, collection_name, vector_size)
+    - _ensure_payload_indexes(client, collection_name)
+    
+    ==Notes==
+    - Manages both cloud and docker collections
+    - Cloud: always required
+    - Docker: optional with cloud fallback
+    - Uses UUIDv7 for point IDs (monotonic)
+    - Creates indexes for md5 (keyword) and chunkno (integer)
+    - Prevents duplicate ingestion via MD5 check
+  }
+}
+
+' ===================================================================
+' CORE SERVICES - CHAT STORAGE
+' ===================================================================
+
+package "Core Services - Chat Storage" <<Rectangle>> #E3F2FD {
+  
+  class "app/core/chat_storage.py::ChatStorageService" as ChatStorageService {
+    ==Attributes==
+    + mongo_available: bool
+    + client: MongoClient (optional)
+    + db: Database (optional)
+    + collection: Collection (optional)
+    
+    ==Public Methods==
+    + __init__()
+    + save_chat_history(chat_id, messages, model_type) -> bool
+    + load_chat_history(chat_id: str) -> List[Dict]
+    + get_chat_history(chat_id: str) -> Dict
+    + get_recent_chats(limit: int) -> List[Dict]
+    + close()
+    
+    ==Private Methods==
+    - _build_mongo_uri(base_uri: str) -> str
+    - _save_to_json(chat_id: str, data: Dict) -> bool
+    - _load_from_json(chat_id: str) -> List[Dict]
+    - _get_recent_chats_from_json(limit: int) -> List[Dict]
+    
+    ==Notes==
+    - MongoDB Atlas primary storage
+    - JSON file fallback if MongoDB unavailable
+    - Creates indexes: chat_id (unique), updated_at (desc)
+    - Excludes empty chats from recent list
+    - Appends required URI parameters if missing
+  }
+}
+
+' ===================================================================
+' CORE SERVICES - TTS
+' ===================================================================
+
+package "Core Services - TTS" <<Rectangle>> #E3F2FD {
+  
+  class "app/core/tts.py::TTSService" as TTSService {
+    ==Attributes==
+    + client: genai.Client
+    + model: str
+    
+    ==Public Methods==
+    + __init__()
+    + text_to_speech(text: str) -> Optional[bytes]
+    
+    ==Private Methods==
+    - _convert_to_wav(audio_data: bytes, mime_type: str) -> bytes
+    - _parse_audio_mime_type(mime_type: str) -> dict
+    
+    ==Notes==
+    - Model: gemini-2.5-flash-preview-tts
+    - Voice: Zephyr (prebuilt)
+    - Converts to WAV format
+    - Temperature: 1
+    - Returns audio bytes or None
+  }
+}
+
+' ===================================================================
+' BUSINESS SERVICES
+' ===================================================================
+
+package "Business Services" <<Rectangle>> #F3E5F5 {
+  
+  class "app/services/document_processor.py::DocumentProcessor" as DocumentProcessor {
+    ==Attributes==
+    + text_splitter: RecursiveCharacterTextSplitter
+    
+    ==Public Methods==
+    + __init__()
+    + load_document(file_path: str) -> Tuple[List[str], List[Dict]]
+    + get_document_metadata(file_path: str) -> Dict
+    + calculate_md5(file_path: str) -> str
+    
+    ==Private Methods==
+    - _process_pdf_with_metadata(documents, file_path) -> Tuple[List[str], List[Dict]]
+    
+    ==Notes==
+    - Supports: TXT, PDF, DOCX, MD
+    - Uses LangChain loaders:
+      * TextLoader (TXT)
+      * PyPDFLoader (PDF)
+      * Docx2txtLoader (DOCX)
+      * UnstructuredMarkdownLoader (MD)
+    - Chunk size: 2000 chars
+    - Chunk overlap: 400 chars
+    - Preserves page numbers for PDFs
+    - Extracts headers from first line
+  }
+  
+  class "app/services/ingestion.py::IngestionService" as IngestionService {
+    ==Attributes==
+    + gemini_embedding: GeminiEmbedding
+    + local_embedding: LocalEmbedding
+    + storage: QdrantStorage
+    + processor: DocumentProcessor
+    
+    ==Public Methods==
+    + __init__()
+    + ingest_document(file_path: str) -> Tuple[bool, str]
+    + ingest_all_documents() -> List[Tuple[str, bool, str]]
+    
+    ==Private Methods==
+    - _ensure_folders()
+    - _determine_destination(cloud_success, docker_success) -> str
+    - _move_file(source: str, destination_folder: str)
+    
+    ==Notes==
+    - Orchestrates full ingestion pipeline
+    - Processes both Gemini and Local embeddings
+    - Stores in both cloud and docker collections
+    - Moves files after processing:
+      * Both success: stored/
+      * Cloud only: stored_in_q_cloud_only/
+      * Docker only: stored_in_q_docker_only/
+    - Creates output folders if needed
+    - Checks for duplicates via MD5
+  }
+  
+  class "app/services/rag.py::RAGService" as RAGService {
+    ==Attributes==
+    + gemini_embedding: GeminiEmbedding
+    + local_embedding: LocalEmbedding
+    + gemini_llm: GeminiLLM
+    + local_llm: LocalLLM
+    + storage: QdrantStorage
+    + chat_storage: ChatStorageService
+    
+    ==Public Methods==
+    + __init__()
+    + query(user_query, model_type, chat_id) -> Tuple[str, Optional[str], str, List[Dict]]
+    + query_stream(user_query, model_type, chat_id) -> Generator
+    + get_recent_chats(limit: int) -> List[Dict]
+    + get_chat_history(chat_id: str) -> Dict
+    
+    ==Private Methods==
+    - _build_context(search_results: List[Dict]) -> str
+    - _extract_sources(search_results, used_indices) -> List[Dict]
+    - _load_chat_history(chat_id: str) -> List[Dict]
+    - _save_chat_history(chat_id, messages, model_type)
+    - _remove_sources_line_from_text(response: str) -> str
+    
+    ==Notes==
+    - Orchestrates full RAG pipeline
+    - Supports both Gemini and qwen3 models
+    - Streaming only for Gemini
+    - Retrieves top 4 similar documents
+    - Tracks which sources were used
+    - Manages chat history (MongoDB/JSON)
+    - Generates chat_id if not provided
+    - Includes last 5 messages for context
+  }
+}
+
+' ===================================================================
+' DATA MODELS
+' ===================================================================
+
+package "Data Models" <<Rectangle>> #FCE4EC {
+  
+  class "app/models/schemas.py::QueryRequest" as QueryRequest {
+    + query: str
+    + model_type: str = "gemini"
+    + chat_id: Optional[str] = None
+  }
+  
+  class "app/models/schemas.py::SourceInfo" as SourceInfo {
+    + header: str
+    + page: int
+    + filename: str
+    + text: str
+    + chunkno: int
+  }
+  
+  class "app/models/schemas.py::QueryResponse" as QueryResponse {
+    + response: str
+    + thinking: Optional[str] = None
+    + chat_id: str
+    + sources: List[SourceInfo] = []
+  }
+  
+  class "app/models/schemas.py::IngestionResponse" as IngestionResponse {
+    + success: bool
+    + message: str
+    + filename: str
+  }
+  
+  class "app/models/schemas.py::ChatHistoryItem" as ChatHistoryItem {
+    + chat_id: str
+    + model_type: str
+    + preview: str
+    + updated_at: str
+    + message_count: int
+  }
+  
+  class "app/models/schemas.py::HealthResponse" as HealthResponse {
+    + status: str
+    + message: str
+  }
+}
+
+' ===================================================================
+' UTILITIES
+' ===================================================================
+
+package "Utilities" <<Rectangle>> #EFEBE9 {
+  
+  class "app/utils/logging_config.py" as LoggingConfig {
+    ==Functions==
+    + setup_logging() -> Tuple[Logger, Logger]
+    
+    ==Global Loggers==
+    + app_logger: Logger
+    + error_logger: Logger
+    
+    ==Notes==
+    - Creates logs/ directory
+    - App logs: app_logs_{date}.log (INFO+)
+    - Error logs: errors_{date}.log (ERROR+)
+    - File and console handlers
+    - Detailed formatter with timestamp, module, function, line
+  }
+}
+
+' ===================================================================
+' EXTERNAL SERVICES
+' ===================================================================
+
+cloud "External Services" <<Cloud>> #FFE0B2 {
+  
+  interface "Gemini API" as GeminiAPI {
+    - Embedding: gemini-embedding-001
+    - Chat: gemini-2.5-flash
+    - TTS: gemini-2.5-flash-preview-tts
+  }
+  
+  interface "LM Studio" as LMStudio {
+    - Embedding: embeddinggemma-300m-qat
+    - Chat: qwen3-1.7b
+    - Port: 1234
+  }
+  
+  interface "HuggingFace" as HF {
+    - Embedding: google/embeddinggemma-300m
+    - Chat: Qwen/Qwen3-1.7B
+    - Provider: featherless-ai
+  }
+  
+  interface "Qdrant Cloud" as QdrantCloud {
+    - Collections: bootcamp_rag_cloud (3072d)
+                   bootcamp_rag_docker (768d)
+    - Distance: COSINE
+  }
+  
+  interface "Qdrant Docker" as QdrantDocker {
+    - Collection: bootcamp_rag_docker (768d)
+    - URL: http://localhost:6333
+  }
+  
+  interface "MongoDB Atlas" as MongoDB {
+    - Database: devkraft_rag
+    - Collection: chat_history
+  }
+}
+
+' ===================================================================
+' RUNTIME FOLDERS
+' ===================================================================
+
+folder "Runtime Folders" <<Folder>> #E0E0E0 {
+  
+  folder "generate_embeddings/" as GenEmbed {
+    Document upload location
+  }
+  
+  folder "generate_embeddings/stored/" as Stored {
+    Both cloud and docker successful
+  }
+  
+  folder "generate_embeddings/stored_in_q_cloud_only/" as CloudOnly {
+    Cloud successful only
+  }
+  
+  folder "generate_embeddings/stored_in_q_docker_only/" as DockerOnly {
+    Docker successful only
+  }
+  
+  folder "user_chat/" as UserChat {
+    JSON chat history fallback
+  }
+  
+  folder "logs/" as Logs {
+    Application and error logs
+  }
+}
+
+' ===================================================================
+' RELATIONSHIPS - ENTRY POINTS
+' ===================================================================
+
+streamlit_app.py --> AppMain : HTTP Requests (port 8000)
+start.sh --> AppMain : Starts
+start.sh --> streamlit_app.py : Starts
+
+' ===================================================================
+' RELATIONSHIPS - CONFIGURATION
+' ===================================================================
+
+Settings --> EnvFile : Loads
+AppMain ..> Settings : Uses
+streamlit_app.py ..> Settings : Indirect (via API)
+
+' ===================================================================
+' RELATIONSHIPS - API TO SERVICES
+' ===================================================================
+
+AppMain --> RAGService : Uses
+AppMain --> IngestionService : Uses
+AppMain --> TTSService : Uses
+AppMain --> ChatStorageService : Direct access
+AppMain --> QueryRequest : Validates
+AppMain --> QueryResponse : Returns
+AppMain --> IngestionResponse : Returns
+AppMain --> HealthResponse : Returns
+AppMain --> ChatHistoryItem : Returns
+
+' ===================================================================
+' RELATIONSHIPS - RAG SERVICE
+' ===================================================================
+
+RAGService --> GeminiEmbedding : embed_query()
+RAGService --> LocalEmbedding : embed_query()
+RAGService --> GeminiLLM : generate_response_with_sources()
+RAGService --> LocalLLM : generate_response_with_sources()
+RAGService --> QdrantStorage : search_cloud() / search_docker()
+RAGService --> ChatStorageService : save_chat_history() / load_chat_history()
+RAGService ..> Settings : Uses
+RAGService ..> LoggingConfig : Uses
+
+' ===================================================================
+' RELATIONSHIPS - INGESTION SERVICE
+' ===================================================================
+
+IngestionService --> DocumentProcessor : load_document() / calculate_md5()
+IngestionService --> GeminiEmbedding : embed_documents()
+IngestionService --> LocalEmbedding : embed_documents()
+IngestionService --> QdrantStorage : store_embeddings_cloud() / store_embeddings_docker()
+IngestionService ..> Settings : Uses
+IngestionService ..> LoggingConfig : Uses
+
+' ===================================================================
+' RELATIONSHIPS - DOCUMENT PROCESSOR
+' ===================================================================
+
+DocumentProcessor ..> Settings : Uses (chunk_size, chunk_overlap)
+DocumentProcessor ..> LoggingConfig : Uses
+
+' ===================================================================
+' RELATIONSHIPS - CORE TO EXTERNAL
+' ===================================================================
+
+GeminiEmbedding --> GeminiAPI : embed_content()
+GeminiEmbedding ..> Settings : Uses
+GeminiEmbedding ..> LoggingConfig : Uses
+
+LocalEmbedding --> LMStudio : POST /v1/embeddings (primary)
+LocalEmbedding --> HF : feature_extraction() (fallback)
+LocalEmbedding ..> Settings : Uses
+LocalEmbedding ..> LoggingConfig : Uses
+
+GeminiLLM --> GeminiAPI : generate_content() / generate_content_stream()
+GeminiLLM ..> Settings : Uses
+GeminiLLM ..> LoggingConfig : Uses
+
+LocalLLM --> LMStudio : POST /v1/chat/completions (primary)
+LocalLLM --> HF : chat.completions.create() (fallback)
+LocalLLM ..> Settings : Uses
+LocalLLM ..> LoggingConfig : Uses
+
+QdrantStorage --> QdrantCloud : upsert() / search() / scroll()
+QdrantStorage --> QdrantDocker : upsert() / search()
+QdrantStorage ..> Settings : Uses
+QdrantStorage ..> LoggingConfig : Uses
+
+ChatStorageService --> MongoDB : replace_one() / find_one() / find()
+ChatStorageService --> UserChat : JSON read/write (fallback)
+ChatStorageService ..> Settings : Uses
+ChatStorageService ..> LoggingConfig : Uses
+
+TTSService --> GeminiAPI : generate_content_stream() (audio)
+TTSService ..> Settings : Uses
+TTSService ..> LoggingConfig : Uses
+
+' ===================================================================
+' RELATIONSHIPS - RUNTIME FOLDERS
+' ===================================================================
+
+IngestionService --> GenEmbed : Reads documents
+IngestionService --> Stored : Moves files (both success)
+IngestionService --> CloudOnly : Moves files (cloud only)
+IngestionService --> DockerOnly : Moves files (docker only)
+LoggingConfig --> Logs : Writes logs
+
+' ===================================================================
+' NOTES AND LEGENDS
+' ===================================================================
+
+note top of GeminiEmbedding
+  **Rate Limiting**
+  10-second delay every 50 API calls
+  to prevent quota exhaustion
+end note
+
+note top of LocalEmbedding
+  **Normalization**
+  Uses np.linalg.norm() to normalize
+  embeddings to unit length
+end note
+
+note top of QdrantStorage
+  **UUIDv7**
+  Uses uuid7() for monotonic point IDs
+  Better for time-series data
+end note
+
+note top of RAGService
+  **Context Window**
+  Includes last 5 messages
+  from chat history
+end note
+
+note top of DocumentProcessor
+  **Chunking Strategy**
+  RecursiveCharacterTextSplitter
+  Separators: \\n\\n, \\n, space, empty
+  Preserves document structure
+end note
+
+legend bottom
+  |= Symbol |= Meaning |
+  | --> | Uses / Calls |
+  | ..> | Depends on / Imports |
+  | <|-- | Inherits from |
+  
+  |= Color |= Component Type |
+  | Light Green | Entry Points |
+  | Light Yellow | Configuration |
+  | Light Blue | Core Services |
+  | Light Purple | Business Services |
+  | Light Pink | Data Models |
+  | Light Brown | Utilities |
+  | Light Orange | External Services |
+  | Gray | Runtime Folders |
+endlegend
+
+@enduml
