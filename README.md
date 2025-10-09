@@ -153,63 +153,52 @@ Choose between two models in the sidebar dropdown:
 4. For Qwen3 model, expand "Show Thinking" to see reasoning
 5. Click "🔊 Listen" button to hear the response in audio
 
-### Live Voice Interaction - Continuous Phone Call Experience
+### Live Voice Interaction - Browser-Based Phone Call
 
-Experience real-time voice conversation like an actual phone call with Voice Activity Detection:
+Experience real-time voice conversation in your browser with Voice Activity Detection:
 
-**🖥️ Desktop Audio Client (Recommended):**
+**🌐 Web Browser Live Call:**
 
-For the full continuous voice experience, use the desktop client:
-
-```bash
-# English (India)
-python live_audio_client.py --language en-IN
-
-# Hindi (India)
-python live_audio_client.py --language hi-IN
-```
-
-**⚠️ Troubleshooting:** If you encounter errors (especially on Windows), see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for solutions.
-
-**Features:**
-- 🎤 **Continuous Voice Streaming**: No clicking needed - just speak naturally
-- 🔊 **Voice Activity Detection (VAD)**: Automatically detects when you're speaking
-- 💬 **Affective Dialog**: Natural emotional responses
-- 🔄 **Turn Coverage**: Better conversation flow
-- 📝 **Real-time Transcription**: See what you said and AI's responses
-- ⚡ **Low Latency**: Instant audio responses via pyaudio
-
-**How it works:**
-1. Run the command above
-2. Speak naturally - VAD automatically detects your voice
-3. AI responds with voice and text immediately
-4. Continue conversation without clicking anything
-5. Press Ctrl+C to exit
+1. Click **"🎤 Talk (English)"** or **"🎤 Talk (Hindi)"** button in the Streamlit UI
+2. A new tab will open with the Live Voice Call interface
+3. Click "Connect" to start
+4. Allow microphone permissions when prompted
+5. Speak naturally - Voice Activity Detection handles turn-taking automatically
+6. AI responds with both voice and text in real-time
+7. Click "Disconnect" when done
 
 **Supported Languages:**
 - English (India) - en-IN
 - Hindi (India) - hi-IN
 
-**🌐 Web UI Alternative:**
+**Features:**
+- 🎤 **Browser-Based**: No desktop client needed - works in any modern browser
+- 🔊 **Voice Activity Detection (VAD)**: Automatically detects when you're speaking
+- 💬 **Live Chat Display**: See conversation with text transcription in real-time
+- 🔄 **Continuous Conversation**: No clicking after initial connection
+- 📝 **Real-time Transcription**: Both your speech and AI responses shown as text
+- ⚡ **WebSocket Streaming**: Low latency bidirectional audio
 
-For text-based interaction through Streamlit:
-1. Click **"🎤 Talk (English)"** or **"🎤 Talk (Hindi)"** button
-2. Type your message and get audio responses
-3. Note: Browser limitations prevent continuous audio streaming
+**How it works:**
+1. JavaScript connects to Gemini Live API via WebSocket
+2. Browser microphone captures your voice
+3. Audio streams to Gemini in real-time
+4. VAD automatically detects when you're speaking
+5. AI responds with voice and text simultaneously
+6. No clicking needed - true phone call experience
 
 **Technical Details:**
 - Model: gemini-2.5-flash-native-audio-preview-09-2025
 - Voice Activity Detection (VAD) enabled
 - Affective dialog for natural conversation
 - Turn coverage for smooth interactions
-- Thinking mode disabled for faster responses
-- Direct pyaudio streaming (desktop client)
+- WebSocket for bidirectional streaming
+- Browser Web Audio API for microphone/speaker access
 
-**Why Desktop Client?**
-- Browser/Streamlit cannot do continuous bidirectional audio streaming
-- Desktop client provides true phone call experience
-- Direct microphone and speaker access via pyaudio
-- Proper implementation of Gemini Live API specifications
+**Browser Requirements:**
+- Modern browser (Chrome, Firefox, Edge, Safari)
+- Microphone access permission
+- Stable internet connection
 
 ### Chat History
 
@@ -234,10 +223,12 @@ For text-based interaction through Streamlit:
 ### Live API Endpoints
 - `POST /live/start-session` - Start a Live API session with language selection
 - `POST /live/send-text` - Send text to Live API and get audio response
+- `POST /live/get-token` - Get ephemeral token for Live API connection
+- `WS /live/ws` - WebSocket endpoint for continuous audio streaming
 - `GET /live/session-info` - Get information about an active session
 
-### Desktop Audio Client
-- `live_audio_client.py` - Standalone client for continuous voice conversation with VAD
+### Browser Live Call
+- `/static/live_call.html` - Browser-based Live API interface with full VAD support
 
 Visit http://localhost:8000/docs for interactive API documentation.
 

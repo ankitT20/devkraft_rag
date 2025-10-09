@@ -2,10 +2,13 @@
 FastAPI application for RAG system.
 """
 import os
+import asyncio
+import json
 from pathlib import Path
 from typing import List
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import aiofiles
 
 from app.config import settings
@@ -48,6 +51,11 @@ rag_service = RAGService()
 ingestion_service = IngestionService()
 tts_service = TTSService()
 live_api_service = LiveAPIService()
+
+# Mount static files
+static_path = Path(__file__).parent.parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 app_logger.info("FastAPI application initialized")
 
@@ -315,6 +323,118 @@ async def start_live_session(request: LiveSessionRequest):
     except Exception as e:
         error_logger.error(f"Failed to start Live API session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/live/get-token")
+async def get_ephemeral_token(request: LiveSessionRequest):
+    """
+    Get ephemeral token for Live API connection.
+    
+    Args:
+        request: Language selection
+        
+    Returns:
+        Ephemeral token
+    """
+    try:
+        # For now, return the API key (in production, generate ephemeral token)
+        # Gemini Live API supports ephemeral tokens but we'll implement it later
+        app_logger.info(f"Generating ephemeral token for language: {request.language}")
+        
+        return {
+            "token": settings.gemini_api_key,
+            "language": request.language,
+            "message": "Token generated successfully"
+        }
+        
+    except Exception as e:
+        error_logger.error(f"Failed to generate token: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/live/ws")
+async def websocket_live_api(websocket: WebSocket, language: str = "en-IN"):
+    """
+    WebSocket endpoint for Live API audio streaming.
+    
+    Args:
+        websocket: WebSocket connection
+        language: Language code
+    """
+    await websocket.accept()
+    app_logger.info(f"WebSocket connection established for language: {language}")
+    
+    try:
+        # Create Live API session
+        async with live_api_service.client.aio.live.connect(
+            model=live_api_service.model,
+            config=live_api_service.get_config(language)
+        ) as session:
+            
+            # Create queues for audio
+            audio_in_queue = asyncio.Queue()
+            audio_out_queue = asyncio.Queue()
+            
+            # Task to receive from client and send to Gemini
+            async def receive_from_client():
+                try:
+                    while True:
+                        data = await websocket.receive_text()
+                        message = json.loads(data)
+                        
+                        if message.get('type') == 'audio':
+                            # Convert array back to bytes
+                            audio_data = bytes(message['data'])
+                            await session.send(input={"data": audio_data, "mime_type": "audio/pcm"})
+                except WebSocketDisconnect:
+                    app_logger.info("Client disconnected")
+                except Exception as e:
+                    error_logger.error(f"Error receiving from client: {e}")
+            
+            # Task to receive from Gemini and send to client
+            async def receive_from_gemini():
+                try:
+                    while True:
+                        turn = session.receive()
+                        async for response in turn:
+                            if response.data:
+                                # Send audio to client
+                                await websocket.send_json({
+                                    "type": "audio",
+                                    "data": list(response.data)
+                                })
+                            if response.text:
+                                # Send transcript to client
+                                await websocket.send_json({
+                                    "type": "transcript",
+                                    "role": "model",
+                                    "text": response.text
+                                })
+                except Exception as e:
+                    error_logger.error(f"Error receiving from Gemini: {e}")
+            
+            # Run both tasks concurrently
+            await asyncio.gather(
+                receive_from_client(),
+                receive_from_gemini()
+            )
+            
+    except WebSocketDisconnect:
+        app_logger.info("WebSocket disconnected")
+    except Exception as e:
+        error_logger.error(f"WebSocket error: {e}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": str(e)
+            })
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
 
 
 @app.get("/live/session-info")

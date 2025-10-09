@@ -290,12 +290,16 @@ def main():
         st.title(f"Welcome to Devkraft RAG - Current Model: {st.session_state.model_type.upper()}")
     with col2:
         if st.button("🎤 Talk (English)", key="talk_english", use_container_width=True):
-            st.session_state.live_language = "en-IN"
-            st.session_state.show_live_modal = True
+            # Open Live API page in new tab
+            st.markdown(f'<meta http-equiv="refresh" content="0;url={API_URL}/static/live_call.html?language=en-IN" target="_blank">', unsafe_allow_html=True)
+            st.write("Opening Live Voice Call in new tab...")
+            st.markdown(f'[Click here if it doesn\'t open automatically]({API_URL}/static/live_call.html?language=en-IN)')
     with col3:
         if st.button("🎤 Talk (Hindi)", key="talk_hindi", use_container_width=True):
-            st.session_state.live_language = "hi-IN"
-            st.session_state.show_live_modal = True
+            # Open Live API page in new tab
+            st.markdown(f'<meta http-equiv="refresh" content="0;url={API_URL}/static/live_call.html?language=hi-IN" target="_blank">', unsafe_allow_html=True)
+            st.write("Opening Live Voice Call in new tab...")
+            st.markdown(f'[Click here if it doesn\'t open automatically]({API_URL}/static/live_call.html?language=hi-IN)')
     
     # Display chat messages
     for i, message in enumerate(st.session_state.messages):
@@ -350,126 +354,7 @@ def main():
                         except Exception as e:
                             st.error(f"Audio generation error: {e}")
     
-    # Live API Modal
-    if st.session_state.get("show_live_modal", False):
-        st.markdown("---")
-        st.subheader(f"🎤 Live Voice Interaction ({st.session_state.live_language})")
-        
-        st.warning("""
-        **⚠️ Note: Continuous Voice Conversation Requires Desktop Client**
-        
-        For a true phone call experience with Voice Activity Detection (VAD), you need to use the 
-        desktop audio client which provides:
-        - **Continuous streaming** - No clicking needed
-        - **Voice Activity Detection** - Automatically detects when you're speaking
-        - **Real-time conversation** - Like a phone call or meeting
-        - **Low latency** - Instant audio responses
-        """)
-        
-        st.info("""
-        **🖥️ To Start Desktop Voice Client:**
-        
-        1. Open a terminal in the project directory
-        2. Run one of these commands:
-        
-        **English (India):**
-        ```bash
-        python live_audio_client.py --language en-IN
-        ```
-        
-        **Hindi (India):**
-        ```bash
-        python live_audio_client.py --language hi-IN
-        ```
-        
-        3. Just speak naturally - Voice Activity Detection (VAD) will handle turn-taking
-        4. No clicking needed - it works like a phone call!
-        5. Press Ctrl+C to exit
-        
-        **Features:**
-        - ✅ Voice Activity Detection (VAD)
-        - ✅ Affective Dialog (natural emotional responses)
-        - ✅ Turn Coverage (better conversation flow)
-        - ✅ Continuous audio streaming with pyaudio
-        - ✅ No browser limitations
-        """)
-        
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            if st.button("✅ Check Session", key="start_live_session"):
-                with st.spinner("Checking Live API session..."):
-                    try:
-                        response = requests.post(
-                            f"{API_URL}/live/start-session",
-                            json={"language": st.session_state.live_language}
-                        )
-                        if response.status_code == 200:
-                            st.success("✓ Live API is ready! Use the desktop client for continuous voice.")
-                        else:
-                            st.error("Failed to connect to Live API")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-        
-        with col2:
-            if st.button("❌ Close", key="close_live_modal"):
-                st.session_state.show_live_modal = False
-                st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 💡 Why Desktop Client?")
-        st.markdown("""
-        **Browser Limitations:**
-        - ❌ Streamlit cannot do continuous audio streaming
-        - ❌ Browser-based recording requires clicking for each message
-        - ❌ High latency with file uploads
-        - ❌ No Voice Activity Detection in browser
-        
-        **Desktop Client Advantages:**
-        - ✅ Direct microphone/speaker access via pyaudio
-        - ✅ Continuous bidirectional audio streaming
-        - ✅ Voice Activity Detection (VAD) built-in
-        - ✅ Low latency real-time conversation
-        - ✅ Proper implementation of Gemini Live API
-        
-        The desktop client (`live_audio_client.py`) provides the full phone call experience 
-        as intended by the Gemini Live API.
-        """)
-        
-        st.markdown("### ⌨️ Text Input (Alternative)")
-        st.caption("For text-based interaction without continuous audio:")
-        
-        # Text input for Live API
-        live_prompt = st.text_input(
-            "Type your message:",
-            key="live_text_input",
-            placeholder="Enter text to send via Live API..."
-        )
-        
-        if st.button("📤 Send Text", key="send_live_text"):
-            if live_prompt:
-                with st.spinner("🔄 Sending to Live API and getting response..."):
-                    try:
-                        response = requests.post(
-                            f"{API_URL}/live/send-text",
-                            json={
-                                "text": live_prompt,
-                                "language": st.session_state.live_language
-                            }
-                        )
-                        if response.status_code == 200:
-                            # Get response text from headers if present
-                            response_text = response.headers.get("X-Response-Text", "Response received")
-                            
-                            st.success(f"**🤖 AI Response:** {response_text}")
-                            
-                            # Play audio response
-                            st.audio(response.content, format="audio/wav", autoplay=True)
-                        else:
-                            st.error("Failed to send message")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-        
-        st.markdown("---")
+
     
     # Chat input
     if prompt := st.chat_input("Ask a question..."):
