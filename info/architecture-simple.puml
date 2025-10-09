@@ -1,0 +1,169 @@
+@startuml DevKraft_RAG_Architecture
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+' Title and Header
+title DevKraft RAG System Architecture
+header
+<font color=blue size=16><b>DevKraft RAG</b></font>
+<i>Retrieval-Augmented Generation System</i>
+endheader
+
+' Entry Points
+package "🚀 Entry Points" #E8F5E9 {
+  component [streamlit_app.py\n<i>Streamlit UI</i>] as UI #C8E6C9
+  component [app/main.py\n<i>FastAPI Backend</i>] as API #C8E6C9
+  component [start.sh\n<i>Startup Script</i>] as Script #C8E6C9
+}
+
+' Configuration
+package "⚙️ Configuration" #FFF9C4 {
+  component [app/config.py\n<i>Settings Manager</i>] as Config #FFF59D
+  component [.env\n<i>Environment Vars</i>] as EnvFile #FFF59D
+}
+
+' Core Services
+package "🔧 Core Services" #E3F2FD {
+  component [GeminiEmbedding\n<i>gemini-embedding-001</i>] as GeminiEmbed #90CAF9
+  component [LocalEmbedding\n<i>embeddinggemma-300m</i>] as LocalEmbed #90CAF9
+  component [QdrantStorage\n<i>Vector DB Manager</i>] as Storage #90CAF9
+  component [GeminiLLM\n<i>gemini-2.5-flash</i>] as GeminiLLM #90CAF9
+  component [LocalLLM\n<i>qwen3-1.7b</i>] as LocalLLM #90CAF9
+  component [ChatStorageService\n<i>Chat History</i>] as ChatStorage #90CAF9
+  component [TTSService\n<i>Text-to-Speech</i>] as TTS #90CAF9
+}
+
+' Business Services
+package "💼 Business Services" #F3E5F5 {
+  component [DocumentProcessor\n<i>PDF/TXT/DOCX Parser</i>] as DocProcessor #CE93D8
+  component [IngestionService\n<i>Document Embeddings</i>] as Ingestion #CE93D8
+  component [RAGService\n<i>Query Processing</i>] as RAG #CE93D8
+}
+
+' Models
+package "📊 Data Models" #FCE4EC {
+  component [Schemas\n<i>Pydantic Models</i>] as Schemas #F48FB1
+}
+
+' Utils
+package "🛠️ Utilities" #EFEBE9 {
+  component [Logging\n<i>App & Error Logs</i>] as Logging #BCAAA4
+}
+
+' External Services
+cloud "☁️ External Services" #FFE0B2 {
+  database "Gemini API\n<i>Google AI</i>" as GeminiAPI #FFB74D
+  database "LM Studio\n<i>Local LLM Server</i>" as LMStudio #FFB74D
+  database "HuggingFace\n<i>Model Hub</i>" as HF #FFB74D
+  database "Qdrant Cloud\n<i>europe-west3</i>" as QdrantCloud #FFB74D
+  database "Qdrant Docker\n<i>localhost:6333</i>" as QdrantDocker #FFB74D
+  database "MongoDB Atlas\n<i>Chat History DB</i>" as MongoDB #FFB74D
+}
+
+' Runtime Folders
+folder "📁 Runtime Folders" #E0E0E0 {
+  folder "generate_embeddings\n<i>Documents to Process</i>" as GenEmbed #BDBDBD
+  folder "user_chat\n<i>JSON Chat History</i>" as UserChat #BDBDBD
+  folder "logs\n<i>Application Logs</i>" as Logs #BDBDBD
+}
+
+' ==================== Relationships ====================
+
+' Entry Points
+UI --> API : HTTP Requests
+Script --> API : Starts Server
+Script --> UI : Starts Interface
+
+' Configuration
+Config --> EnvFile : Loads Variables
+API --> Config : Reads Settings
+
+' API to Services
+API --> RAG : Query Processing
+API --> Ingestion : Document Upload
+API --> TTS : Audio Generation
+API --> ChatStorage : History Management
+
+' RAG Service Flow
+RAG --> GeminiEmbed : Generate Embeddings
+RAG --> LocalEmbed : Generate Embeddings
+RAG --> GeminiLLM : Generate Response
+RAG --> LocalLLM : Generate Response
+RAG --> Storage : Vector Search
+RAG --> ChatStorage : Save/Load History
+
+' Ingestion Service Flow
+Ingestion --> DocProcessor : Parse Documents
+Ingestion --> GeminiEmbed : Create Vectors
+Ingestion --> LocalEmbed : Create Vectors
+Ingestion --> Storage : Store Embeddings
+
+' Core to External Services
+GeminiEmbed --> GeminiAPI : API Calls
+GeminiLLM --> GeminiAPI : API Calls
+TTS --> GeminiAPI : TTS API
+LocalEmbed --> LMStudio : HTTP Requests
+LocalEmbed --> HF : Fallback API
+LocalLLM --> LMStudio : HTTP Requests
+LocalLLM --> HF : Fallback API
+Storage --> QdrantCloud : gRPC Connection
+Storage --> QdrantDocker : gRPC Connection
+ChatStorage --> MongoDB : Mongo Protocol
+ChatStorage --> UserChat : JSON Files
+
+' Models Validation
+API --> Schemas : Request/Response
+
+' Logging Integration
+API --> Logging : Log Events
+RAG --> Logging : Log Queries
+Ingestion --> Logging : Log Processing
+DocProcessor --> Logging : Log Parsing
+GeminiEmbed --> Logging : Log API Calls
+LocalEmbed --> Logging : Log Requests
+GeminiLLM --> Logging : Log Generation
+LocalLLM --> Logging : Log Generation
+Storage --> Logging : Log Operations
+ChatStorage --> Logging : Log Storage
+TTS --> Logging : Log TTS
+Logging --> Logs : Write Files
+
+' Runtime Folders
+Ingestion --> GenEmbed : Read/Move Files
+
+' ==================== Legend ====================
+
+legend right
+  |= Component Type |= Color |= Description |
+  | 🚀 Entry Points | <#E8F5E9> Light Green | User interfaces and API |
+  | ⚙️ Configuration | <#FFF9C4> Light Yellow | Settings and environment |
+  | 🔧 Core Services | <#E3F2FD> Light Blue | Core functionality |
+  | 💼 Business Services | <#F3E5F5> Light Purple | Business logic |
+  | 📊 Data Models | <#FCE4EC> Light Pink | Data schemas |
+  | 🛠️ Utilities | <#EFEBE9> Light Brown | Helper functions |
+  | ☁️ External Services | <#FFE0B2> Light Orange | Third-party APIs |
+  | 📁 Runtime Folders | <#E0E0E0> Gray | File storage |
+  
+  <b>Model Options:</b>
+  • <b>Gemini</b>: Cloud-based (Gemini API + Qdrant Cloud)
+  • <b>Qwen3</b>: Local (LM Studio + Docker Qdrant)
+  
+  <b>Key Features:</b>
+  ✓ Dual storage (MongoDB + JSON fallback)
+  ✓ Vector search with Qdrant
+  ✓ PDF/TXT/DOCX support
+  ✓ Streaming responses
+  ✓ Text-to-speech
+endlegend
+
+footer
+<i>DevKraft RAG System - Version 1.0.0</i>
+Generated: %date("yyyy-MM-dd")
+endfooter
+
+@enduml

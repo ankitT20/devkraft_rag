@@ -31,6 +31,11 @@ devkraft_rag/
 │   │   └── logging_config.py
 │   ├── config.py          # Configuration
 │   └── main.py            # FastAPI application
+├── info/                  # Documentation and API collections
+│   ├── rag.postman_collection.json  # Postman API collection
+│   ├── rag.postman_environment.json # Postman environment file
+│   ├── .env.example       # Environment variable template
+│   └── architecture-simple.puml     # System architecture diagram
 ├── streamlit_app.py       # Streamlit UI
 ├── generate_embeddings/   # Document upload folder
 ├── user_chat/             # Chat history storage
@@ -51,7 +56,7 @@ export HF_TOKEN="your_huggingface_token"
 export MONGO_URI="mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true"
 ```
 
-Or create a `.env` file (see `.env.example`).
+Or create a `.env` file (see `info/.env.example`).
 
 **MongoDB Atlas Setup (Optional):**
 - If `MONGO_URI` is provided, chat history will be stored in MongoDB Atlas
@@ -157,13 +162,28 @@ Choose between two models in the sidebar dropdown:
 ## API Endpoints
 
 - `GET /` - Health check
+- `GET /health` - Health status
 - `POST /query` - Process RAG query
+- `POST /query-stream` - Process RAG query with streaming response
 - `POST /upload` - Upload and ingest document
 - `POST /ingest-all` - Ingest all documents in folder
 - `GET /chats` - Get recent chat sessions
 - `GET /chat/{chat_id}` - Get full chat history
+- `POST /tts` - Convert text to speech
 
 Visit http://localhost:8000/docs for interactive API documentation.
+
+### Testing with Postman
+
+A complete Postman collection is available in the `info/` folder:
+
+1. **Collection**: `info/rag.postman_collection.json` - Contains all API endpoints with pre-filled examples
+2. **Environment**: `info/rag.postman_environment.json` - Environment variables for API keys and configuration
+
+To use:
+1. Import both files into Postman
+2. Update the environment variables with your actual API keys (replace `****`)
+3. Start testing the APIs immediately
 
 ## Configuration
 
