@@ -1,0 +1,137 @@
+@startuml DevKraft_RAG_Architecture
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+' Entry Points
+package "Entry Points" #E8F5E9 {
+  component [streamlit_app.py] as UI
+  component [app/main.py] as API
+  component [start.sh] as Script
+}
+
+' Configuration
+package "Configuration" #FFF9C4 {
+  component [app/config.py] as Config
+  component [.env] as EnvFile
+}
+
+' Core Services
+package "Core Services" #E3F2FD {
+  component [GeminiEmbedding] as GeminiEmbed
+  component [LocalEmbedding] as LocalEmbed
+  component [QdrantStorage] as Storage
+  component [GeminiLLM] as GeminiLLM
+  component [LocalLLM] as LocalLLM
+  component [ChatStorageService] as ChatStorage
+  component [TTSService] as TTS
+}
+
+' Business Services
+package "Business Services" #F3E5F5 {
+  component [DocumentProcessor] as DocProcessor
+  component [IngestionService] as Ingestion
+  component [RAGService] as RAG
+}
+
+' Models
+package "Data Models" #FCE4EC {
+  component [Schemas] as Schemas
+}
+
+' Utils
+package "Utilities" #EFEBE9 {
+  component [Logging] as Logging
+}
+
+' External Services
+cloud "External Services" #FFE0B2 {
+  database "Gemini API" as GeminiAPI
+  database "LM Studio" as LMStudio
+  database "HuggingFace" as HF
+  database "Qdrant Cloud" as QdrantCloud
+  database "Qdrant Docker" as QdrantDocker
+  database "MongoDB Atlas" as MongoDB
+}
+
+' Runtime Folders
+folder "Runtime Folders" #E0E0E0 {
+  folder "generate_embeddings" as GenEmbed
+  folder "user_chat" as UserChat
+  folder "logs" as Logs
+}
+
+' Relationships - Entry Points
+UI --> API : HTTP
+Script --> API : Starts
+Script --> UI : Starts
+
+' Relationships - Configuration
+Config --> EnvFile : Loads
+API --> Config : Uses
+
+' Relationships - API to Services
+API --> RAG : Uses
+API --> Ingestion : Uses
+API --> TTS : Uses
+API --> ChatStorage : Uses
+
+' Relationships - RAG Service
+RAG --> GeminiEmbed : Uses
+RAG --> LocalEmbed : Uses
+RAG --> GeminiLLM : Uses
+RAG --> LocalLLM : Uses
+RAG --> Storage : Searches
+RAG --> ChatStorage : Saves/Loads
+
+' Relationships - Ingestion Service
+Ingestion --> DocProcessor : Uses
+Ingestion --> GeminiEmbed : Uses
+Ingestion --> LocalEmbed : Uses
+Ingestion --> Storage : Stores
+
+' Relationships - Core to External
+GeminiEmbed --> GeminiAPI : API
+GeminiLLM --> GeminiAPI : API
+TTS --> GeminiAPI : API
+LocalEmbed --> LMStudio : HTTP
+LocalEmbed --> HF : HTTP
+LocalLLM --> LMStudio : HTTP
+LocalLLM --> HF : HTTP
+Storage --> QdrantCloud : gRPC
+Storage --> QdrantDocker : gRPC
+ChatStorage --> MongoDB : Mongo
+ChatStorage --> UserChat : JSON
+
+' Relationships - Models
+API --> Schemas : Validates
+
+' Relationships - Logging
+API --> Logging : Uses
+RAG --> Logging : Uses
+Ingestion --> Logging : Uses
+DocProcessor --> Logging : Uses
+GeminiEmbed --> Logging : Uses
+LocalEmbed --> Logging : Uses
+GeminiLLM --> Logging : Uses
+LocalLLM --> Logging : Uses
+Storage --> Logging : Uses
+ChatStorage --> Logging : Uses
+TTS --> Logging : Uses
+Logging --> Logs : Writes
+
+' Relationships - Runtime Folders
+Ingestion --> GenEmbed : Reads/Moves
+
+legend right
+  |= Component Type |= Color |
+  | Entry Points | Light Green |
+  | Configuration | Light Yellow |
+  | Core Services | Light Blue |
+  | Business Services | Light Purple |
+  | Data Models | Light Pink |
+  | Utilities | Light Brown |
+  | External Services | Light Orange |
+  | Runtime Folders | Gray |
+endlegend
+
+@enduml

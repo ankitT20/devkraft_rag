@@ -545,29 +545,29 @@ cloud "External Services" <<Cloud>> #FFE0B2 {
 ' RUNTIME FOLDERS
 ' ===================================================================
 
-folder "Runtime Folders" <<Folder>> #E0E0E0 {
+package "Runtime Folders" <<Rectangle>> #E0E0E0 {
   
-  folder "generate_embeddings/" as GenEmbed {
+  class "generate_embeddings/" as GenEmbed {
     Document upload location
   }
   
-  folder "generate_embeddings/stored/" as Stored {
+  class "generate_embeddings/stored/" as Stored {
     Both cloud and docker successful
   }
   
-  folder "generate_embeddings/stored_in_q_cloud_only/" as CloudOnly {
+  class "generate_embeddings/stored_in_q_cloud_only/" as CloudOnly {
     Cloud successful only
   }
   
-  folder "generate_embeddings/stored_in_q_docker_only/" as DockerOnly {
+  class "generate_embeddings/stored_in_q_docker_only/" as DockerOnly {
     Docker successful only
   }
   
-  folder "user_chat/" as UserChat {
+  class "user_chat/" as UserChat {
     JSON chat history fallback
   }
   
-  folder "logs/" as Logs {
+  class "logs/" as Logs {
     Application and error logs
   }
 }

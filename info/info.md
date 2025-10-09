@@ -178,167 +178,21 @@ devkraft_rag/
 
 ### PlantUML Architecture Diagram
 
-This diagram shows the high-level architecture and relationships between all files:
+This diagram shows the high-level architecture and relationships between all files.
 
-```plantuml
-@startuml DevKraft_RAG_Architecture
-!define RECTANGLE class
+**Rendered Image**: See `DevKraft_RAG_Architecture.png` in this folder for the visual diagram.
 
-' Define color scheme
-skinparam backgroundColor #FEFEFE
-skinparam componentStyle rectangle
+**PlantUML Source Code**: See `architecture-simple.puml` for the source code.
 
-' Entry Points
-package "Entry Points" #E8F5E9 {
-  [streamlit_app.py] as UI
-  [app/main.py] as API
-  [start.sh] as Script
-}
-
-' Configuration
-package "Configuration" #FFF9C4 {
-  [app/config.py] as Config
-  [.env] as EnvFile
-}
-
-' Core Services
-package "Core Services" #E3F2FD {
-  package "Embeddings" {
-    [app/core/embeddings.py::GeminiEmbedding] as GeminiEmbed
-    [app/core/embeddings.py::LocalEmbedding] as LocalEmbed
-  }
-  
-  package "Storage" {
-    [app/core/storage.py::QdrantStorage] as Storage
-  }
-  
-  package "LLM" {
-    [app/core/llm.py::GeminiLLM] as GeminiLLM
-    [app/core/llm.py::LocalLLM] as LocalLLM
-  }
-  
-  package "Chat Storage" {
-    [app/core/chat_storage.py::ChatStorageService] as ChatStorage
-  }
-  
-  package "TTS" {
-    [app/core/tts.py::TTSService] as TTS
-  }
-}
-
-' Business Services
-package "Business Services" #F3E5F5 {
-  [app/services/document_processor.py::DocumentProcessor] as DocProcessor
-  [app/services/ingestion.py::IngestionService] as Ingestion
-  [app/services/rag.py::RAGService] as RAG
-}
-
-' Models
-package "Data Models" #FCE4EC {
-  [app/models/schemas.py] as Schemas
-}
-
-' Utils
-package "Utilities" #EFEBE9 {
-  [app/utils/logging_config.py] as Logging
-}
-
-' External Services
-cloud "External Services" #FFE0B2 {
-  database "Gemini API" as GeminiAPI
-  database "LM Studio" as LMStudio
-  database "HuggingFace" as HF
-  database "Qdrant Cloud" as QdrantCloud
-  database "Qdrant Docker" as QdrantDocker
-  database "MongoDB Atlas" as MongoDB
-}
-
-' Runtime Folders
-folder "Runtime Folders" #E0E0E0 {
-  folder "generate_embeddings/" as GenEmbed
-  folder "user_chat/" as UserChat
-  folder "logs/" as Logs
-}
-
-' Relationships - Entry Points
-UI --> API : HTTP Requests
-Script --> API : Starts
-Script --> UI : Starts
-
-' Relationships - Configuration
-Config --> EnvFile : Loads
-API --> Config : Uses
-UI --> Config : Uses (indirectly)
-
-' Relationships - API to Services
-API --> RAG : Uses
-API --> Ingestion : Uses
-API --> TTS : Uses
-API --> ChatStorage : Uses
-
-' Relationships - RAG Service
-RAG --> GeminiEmbed : Uses
-RAG --> LocalEmbed : Uses
-RAG --> GeminiLLM : Uses
-RAG --> LocalLLM : Uses
-RAG --> Storage : Searches
-RAG --> ChatStorage : Saves/Loads
-
-' Relationships - Ingestion Service
-Ingestion --> DocProcessor : Uses
-Ingestion --> GeminiEmbed : Uses
-Ingestion --> LocalEmbed : Uses
-Ingestion --> Storage : Stores
-
-' Relationships - Core to External
-GeminiEmbed --> GeminiAPI : API Calls
-GeminiLLM --> GeminiAPI : API Calls
-TTS --> GeminiAPI : API Calls
-LocalEmbed --> LMStudio : HTTP (Primary)
-LocalEmbed --> HF : HTTP (Fallback)
-LocalLLM --> LMStudio : HTTP (Primary)
-LocalLLM --> HF : HTTP (Fallback)
-Storage --> QdrantCloud : gRPC/HTTP
-Storage --> QdrantDocker : gRPC/HTTP
-ChatStorage --> MongoDB : MongoClient
-ChatStorage --> UserChat : JSON (Fallback)
-
-' Relationships - Models
-API --> Schemas : Validates
-UI --> Schemas : Uses (indirectly)
-
-' Relationships - Logging
-API --> Logging : Uses
-RAG --> Logging : Uses
-Ingestion --> Logging : Uses
-DocProcessor --> Logging : Uses
-GeminiEmbed --> Logging : Uses
-LocalEmbed --> Logging : Uses
-GeminiLLM --> Logging : Uses
-LocalLLM --> Logging : Uses
-Storage --> Logging : Uses
-ChatStorage --> Logging : Uses
-TTS --> Logging : Uses
-Logging --> Logs : Writes
-
-' Relationships - Runtime Folders
-Ingestion --> GenEmbed : Reads/Moves Files
-
-' Legend
-legend right
-  |= Component Type |= Color |
-  | Entry Points | Light Green |
-  | Configuration | Light Yellow |
-  | Core Services | Light Blue |
-  | Business Services | Light Purple |
-  | Data Models | Light Pink |
-  | Utilities | Light Brown |
-  | External Services | Light Orange |
-  | Runtime Folders | Gray |
-endlegend
-
-@enduml
-```
+**Key Components**:
+- **Entry Points** (Green): User interfaces and startup scripts
+- **Configuration** (Yellow): Settings and environment management
+- **Core Services** (Blue): Embedding, LLM, storage, and TTS services
+- **Business Services** (Purple): Document processing and RAG orchestration
+- **Data Models** (Pink): Request/response validation schemas
+- **Utilities** (Brown): Logging infrastructure
+- **External Services** (Orange): Third-party APIs and databases
+- **Runtime Folders** (Gray): Dynamic data storage
 
 ---
 
@@ -619,3 +473,76 @@ The DevKraft RAG application is a well-architected system with:
 - **Modular design**: Easy to extend and maintain
 
 Each file has a specific responsibility, and the relationships between files follow a clear architectural pattern, making the codebase maintainable and scalable.
+
+---
+
+## Generated Diagrams
+
+This documentation includes comprehensive PlantUML diagrams that have been rendered as PNG images:
+
+### 1. Architecture Overview (`DevKraft_RAG_Architecture.png`)
+- **Size**: ~204 KB
+- **Description**: High-level architecture showing all major components and their relationships
+- **Source**: `architecture-simple.puml`
+- **Shows**:
+  - Entry points (Streamlit UI, FastAPI, startup script)
+  - Configuration layer
+  - Core services (embeddings, LLM, storage)
+  - Business services (RAG, ingestion, document processing)
+  - External dependencies (Gemini API, LM Studio, HuggingFace, Qdrant, MongoDB)
+  - Runtime folders
+
+### 2. Deep Dive Diagram (`DevKraft_RAG_Deep_Dive.png`)
+- **Size**: ~1.5 MB
+- **Description**: Comprehensive diagram showing every class, method, and function
+- **Source**: `deep-dive.puml`
+- **Shows**:
+  - All classes with their attributes and methods
+  - Public and private methods
+  - Method signatures with parameters and return types
+  - Detailed relationships and dependencies
+  - Notes on implementation details
+  - Complete function hierarchy
+
+### How to View the Diagrams
+
+1. **In this folder**: Open the PNG files directly
+   - `DevKraft_RAG_Architecture.png` - High-level overview
+   - `DevKraft_RAG_Deep_Dive.png` - Detailed view
+
+2. **Edit the diagrams**: Modify the `.puml` files and regenerate with:
+   ```bash
+   # Install PlantUML (requires Java)
+   wget https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar
+   
+   # Generate PNG
+   java -jar plantuml.jar -tpng architecture-simple.puml
+   java -jar plantuml.jar -tpng deep-dive.puml
+   ```
+
+3. **Online viewer**: Copy the PlantUML code to http://www.plantuml.com/plantuml/ for live editing
+
+### Diagram Legend
+
+Both diagrams use color coding to distinguish component types:
+
+| Color | Component Type | Description |
+|-------|---------------|-------------|
+| Light Green (#E8F5E9) | Entry Points | User interfaces and startup scripts |
+| Light Yellow (#FFF9C4) | Configuration | Settings and environment management |
+| Light Blue (#E3F2FD) | Core Services | Embedding, LLM, storage services |
+| Light Purple (#F3E5F5) | Business Services | RAG and ingestion orchestration |
+| Light Pink (#FCE4EC) | Data Models | Pydantic schemas |
+| Light Brown (#EFEBE9) | Utilities | Logging and helpers |
+| Light Orange (#FFE0B2) | External Services | Third-party APIs |
+| Gray (#E0E0E0) | Runtime Folders | Dynamic data storage |
+
+---
+
+## Files in This Folder
+
+- **`info.md`** (this file): Complete directory structure documentation and architecture explanation
+- **`deep-dive.puml`**: PlantUML source for the comprehensive deep-dive diagram
+- **`architecture-simple.puml`**: PlantUML source for the high-level architecture diagram
+- **`DevKraft_RAG_Architecture.png`**: Rendered high-level architecture diagram (204 KB)
+- **`DevKraft_RAG_Deep_Dive.png`**: Rendered deep-dive diagram with all functions (1.5 MB)
