@@ -7,16 +7,44 @@ Based on official Gemini Live API quickstart.
 Usage:
     python live_audio_client.py --language en-IN
     python live_audio_client.py --language hi-IN
+
+Troubleshooting:
+    Windows: If you get "Could not find platform independent libraries" error:
+    1. Recreate virtual environment: python -m venv .venv
+    2. Activate: .venv\\Scripts\\activate
+    3. Install dependencies: pip install -r requirements.txt
+    4. Run: python live_audio_client.py --language en-IN
 """
 
 import os
+import sys
 import asyncio
 import argparse
 import traceback
-import pyaudio
 
-from google import genai
-from google.genai import types
+# Check Python version
+if sys.version_info < (3, 8):
+    print("❌ Error: Python 3.8 or higher is required")
+    print(f"   Current version: {sys.version}")
+    sys.exit(1)
+
+# Try importing dependencies with helpful error messages
+try:
+    import pyaudio
+except ImportError as e:
+    print("❌ Error: PyAudio not installed")
+    print("   Install with: pip install pyaudio")
+    print(f"   Details: {e}")
+    sys.exit(1)
+
+try:
+    from google import genai
+    from google.genai import types
+except ImportError as e:
+    print("❌ Error: google-genai not installed")
+    print("   Install with: pip install google-genai")
+    print(f"   Details: {e}")
+    sys.exit(1)
 
 # Audio configuration
 FORMAT = pyaudio.paInt16

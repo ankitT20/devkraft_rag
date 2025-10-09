@@ -169,6 +169,8 @@ python live_audio_client.py --language en-IN
 python live_audio_client.py --language hi-IN
 ```
 
+**⚠️ Troubleshooting:** If you encounter errors (especially on Windows), see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for solutions.
+
 **Features:**
 - 🎤 **Continuous Voice Streaming**: No clicking needed - just speak naturally
 - 🔊 **Voice Activity Detection (VAD)**: Automatically detects when you're speaking
