@@ -7,6 +7,7 @@ import requests
 import logging
 from pathlib import Path
 from datetime import datetime
+import base64
 
 # Set up logging
 logging.basicConfig(
@@ -354,18 +355,22 @@ def main():
         st.markdown("---")
         st.subheader(f"🎤 Live Voice Interaction ({st.session_state.live_language})")
         
+        # Initialize conversation history for live session
+        if "live_conversation" not in st.session_state:
+            st.session_state.live_conversation = []
+        
         st.info("""
         **Live API Voice Interaction**
         
-        This feature uses Gemini's Live API for real-time voice conversation.
+        This feature enables real-time voice conversation with AI like a phone call.
         
         **How to use:**
-        1. Click "Start Session" to begin
-        2. Type your message or speak (audio input coming soon)
-        3. Get real-time audio responses from the AI
+        1. Click "Start Session" to initialize the connection
+        2. Type your message in the text box or use microphone (audio input)
+        3. Get instant audio responses with text transcription
+        4. Continue the conversation - context is maintained
         
-        **Note:** Currently supports text input with audio output. 
-        Full audio input/output requires browser microphone permissions.
+        **Note:** This uses browser microphone for audio input and plays audio responses automatically.
         """)
         
         col1, col2 = st.columns([1, 1])
@@ -378,7 +383,9 @@ def main():
                             json={"language": st.session_state.live_language}
                         )
                         if response.status_code == 200:
-                            st.success("Live API session started!")
+                            st.session_state.live_session_active = True
+                            st.session_state.live_conversation = []
+                            st.success("Live API session started! You can now talk with AI.")
                         else:
                             st.error("Failed to start session")
                     except Exception as e:
@@ -387,8 +394,88 @@ def main():
         with col2:
             if st.button("❌ Close", key="close_live_modal"):
                 st.session_state.show_live_modal = False
+                st.session_state.live_session_active = False
+                st.session_state.live_conversation = []
                 st.rerun()
         
+        # Display conversation history
+        if st.session_state.live_conversation:
+            st.markdown("### 💬 Conversation History")
+            conversation_container = st.container()
+            with conversation_container:
+                for idx, msg in enumerate(st.session_state.live_conversation):
+                    if msg["role"] == "user":
+                        st.markdown(f"**👤 You:** {msg['text']}")
+                    else:
+                        st.markdown(f"**🤖 AI:** {msg['text']}")
+                        if msg.get("audio_played"):
+                            st.caption("🔊 Audio response played")
+                    if idx < len(st.session_state.live_conversation) - 1:
+                        st.markdown("---")
+        
+        # Audio input using browser microphone
+        st.markdown("### 🎙️ Voice Input (Browser Microphone)")
+        st.info("Click the button below to record your voice. Browser will ask for microphone permission.")
+        
+        try:
+            from audio_recorder_streamlit import audio_recorder
+            
+            audio_bytes = audio_recorder(
+                text="Click to record",
+                recording_color="#ff4b4b",
+                neutral_color="#6c757d",
+                icon_name="microphone",
+                icon_size="2x",
+                pause_threshold=2.0,
+                sample_rate=16000
+            )
+            
+            if audio_bytes:
+                st.success("Audio recorded! Processing...")
+                
+                with st.spinner("🔄 Sending audio to Live API..."):
+                    try:
+                        # Send audio to backend
+                        files = {"audio": ("recording.wav", audio_bytes, "audio/wav")}
+                        data = {"language": st.session_state.live_language}
+                        
+                        response = requests.post(
+                            f"{API_URL}/live/send-audio",
+                            files=files,
+                            data=data
+                        )
+                        
+                        if response.status_code == 200:
+                            # Get transcription and response
+                            response_text = response.headers.get("X-Response-Text", "Response received")
+                            transcription = response.headers.get("X-Transcription", "Audio recorded")
+                            
+                            # Add to conversation
+                            st.session_state.live_conversation.append({
+                                "role": "user",
+                                "text": f"🎤 {transcription}"
+                            })
+                            
+                            st.session_state.live_conversation.append({
+                                "role": "assistant",
+                                "text": response_text,
+                                "audio_played": True
+                            })
+                            
+                            # Play audio response
+                            st.audio(response.content, format="audio/wav", autoplay=True)
+                            st.success("✅ Voice message processed! Audio response playing.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to process audio")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+        
+        except ImportError:
+            st.warning("⚠️ Audio recorder component not installed. Using text input only.")
+            st.info("To enable voice input, install: `pip install audio-recorder-streamlit`")
+        
+        st.markdown("### ⌨️ Text Input")
         # Text input for Live API
         live_prompt = st.text_input(
             "Type your message:",
@@ -396,10 +483,16 @@ def main():
             placeholder="Enter text to send via Live API..."
         )
         
-        if st.button("📤 Send", key="send_live_text"):
+        if st.button("📤 Send Text", key="send_live_text"):
             if live_prompt:
-                with st.spinner("Sending to Live API..."):
+                with st.spinner("🔄 Sending to Live API and getting response..."):
                     try:
+                        # Add user message to conversation
+                        st.session_state.live_conversation.append({
+                            "role": "user",
+                            "text": live_prompt
+                        })
+                        
                         response = requests.post(
                             f"{API_URL}/live/send-text",
                             json={
@@ -408,8 +501,20 @@ def main():
                             }
                         )
                         if response.status_code == 200:
-                            st.success("Message sent! Audio response will play automatically.")
-                            # TODO: Implement audio playback from Live API response
+                            # Get response text from headers if present
+                            response_text = response.headers.get("X-Response-Text", "Response received")
+                            
+                            # Add AI response to conversation
+                            st.session_state.live_conversation.append({
+                                "role": "assistant",
+                                "text": response_text,
+                                "audio_played": True
+                            })
+                            
+                            # Play audio response
+                            st.audio(response.content, format="audio/wav", autoplay=True)
+                            st.success("✅ Response received! Audio is playing.")
+                            st.rerun()
                         else:
                             st.error("Failed to send message")
                     except Exception as e:

@@ -155,15 +155,26 @@ Choose between two models in the sidebar dropdown:
 
 ### Live Voice Interaction
 
+Experience real-time voice conversation like a phone call or meeting:
+
 1. Click **"🎤 Talk (English)"** or **"🎤 Talk (Hindi)"** button in the top bar
 2. A Live API interface will appear
 3. Click "Start Session" to initialize the voice interaction
-4. Type your message in the text input
-5. Click "Send" to get real-time audio response
+4. **Voice Input**: Click the microphone button to record your voice (browser will ask for microphone permission)
+5. **Text Input**: Or type your message in the text input box
+6. Get instant audio responses with text transcription
+7. Continue the conversation - full context is maintained
 
 **Supported Languages:**
 - English (India) - en-IN
 - Hindi (India) - hi-IN
+
+**Features:**
+- 🎤 **Browser Microphone Input**: Record voice messages directly in the browser
+- 🔊 **Real-time Audio Output**: Instant audio responses with natural voices
+- 💬 **Conversation History**: See full conversation with text transcription
+- 🔄 **Continuous Chat**: Context-aware responses like a real conversation
+- 📝 **Text Display**: Both input and output text are displayed
 
 **Note:** The Live API uses Gemini's native audio preview model (gemini-2.5-flash-native-audio-preview-09-2025) which automatically selects the appropriate voice for the language.
 
@@ -190,6 +201,7 @@ Choose between two models in the sidebar dropdown:
 ### Live API Endpoints
 - `POST /live/start-session` - Start a Live API session with language selection
 - `POST /live/send-text` - Send text to Live API and get audio response
+- `POST /live/send-audio` - Send audio from microphone and get audio response with transcription
 
 Visit http://localhost:8000/docs for interactive API documentation.
 

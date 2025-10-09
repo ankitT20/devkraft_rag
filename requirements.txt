@@ -36,3 +36,6 @@ opencv-python==4.10.0.84
 pyaudio==0.2.14
 pillow==11.0.0
 mss==10.0.0
+
+# Audio input for Streamlit
+audio-recorder-streamlit==0.0.10

@@ -317,22 +317,111 @@ async def start_live_session(request: LiveSessionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/live/send-audio")
+async def send_audio_to_live(audio: UploadFile = File(...), language: str = "en-IN"):
+    """
+    Send audio to Live API session and get response.
+    
+    Args:
+        audio: Audio file from microphone
+        language: Language code
+        
+    Returns:
+        Audio response in WAV format
+    """
+    try:
+        app_logger.info(f"Receiving audio input for Live API (language: {language})")
+        
+        # Read audio file
+        audio_data = await audio.read()
+        
+        # Create a Live API session
+        async with live_api_service.client.aio.live.connect(
+            model=live_api_service.model,
+            config=live_api_service.get_config(language)
+        ) as session:
+            # Send audio data to Live API
+            await session.send(input={"data": audio_data, "mime_type": "audio/wav"})
+            
+            # Collect response
+            response_text = ""
+            audio_response = b""
+            transcription = ""
+            
+            turn = session.receive()
+            async for response in turn:
+                if response.data:
+                    audio_response += response.data
+                if response.text:
+                    response_text += response.text
+                    if not transcription:
+                        transcription = "Voice input received"
+            
+            app_logger.info(f"Received audio response: {len(audio_response)} bytes, text: {response_text[:100]}...")
+            
+            if audio_response:
+                # Convert raw PCM audio to WAV format
+                import struct
+                sample_rate = 24000
+                num_channels = 1
+                bits_per_sample = 16
+                data_size = len(audio_response)
+                bytes_per_sample = bits_per_sample // 8
+                block_align = num_channels * bytes_per_sample
+                byte_rate = sample_rate * block_align
+                chunk_size = 36 + data_size
+                
+                wav_header = struct.pack(
+                    "<4sI4s4sIHHIIHH4sI",
+                    b"RIFF",
+                    chunk_size,
+                    b"WAVE",
+                    b"fmt ",
+                    16,
+                    1,
+                    num_channels,
+                    sample_rate,
+                    byte_rate,
+                    block_align,
+                    bits_per_sample,
+                    b"data",
+                    data_size
+                )
+                
+                wav_data = wav_header + audio_response
+                
+                return Response(
+                    content=wav_data,
+                    media_type="audio/wav",
+                    headers={
+                        "X-Response-Text": response_text,
+                        "X-Transcription": transcription,
+                        "Content-Disposition": "attachment; filename=response.wav"
+                    }
+                )
+            else:
+                raise HTTPException(status_code=500, detail="No audio response received")
+        
+    except Exception as e:
+        error_logger.error(f"Failed to process audio input: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/live/send-text")
 async def send_text_to_live(request: LiveTextRequest):
     """
-    Send text to Live API session and get response.
+    Send text to Live API session and get response with audio.
     
     Args:
         request: Live API text request
         
     Returns:
-        Text response and audio URL
+        Audio data in WAV format and text response
     """
     try:
         app_logger.info(f"Sending text to Live API: {request.text[:50]}... (language: {request.language})")
         
         # Create a temporary session for this request
-        # In production, this would use an existing session or WebSocket
         async with live_api_service.client.aio.live.connect(
             model=live_api_service.model,
             config=live_api_service.get_config(request.language)
@@ -342,24 +431,63 @@ async def send_text_to_live(request: LiveTextRequest):
             
             # Collect response
             response_text = ""
-            audio_chunks = []
+            audio_data = b""
             
             turn = session.receive()
             async for response in turn:
                 if response.data:
-                    audio_chunks.append(response.data)
+                    audio_data += response.data
                 if response.text:
                     response_text += response.text
             
-            app_logger.info(f"Received response: {response_text[:100]}...")
+            app_logger.info(f"Received response: {response_text[:100]}... with {len(audio_data)} bytes of audio")
             
-            return {
-                "status": "success",
-                "text": response_text,
-                "has_audio": len(audio_chunks) > 0,
-                "audio_chunks": len(audio_chunks),
-                "message": "Text sent and response received"
-            }
+            if audio_data:
+                # Convert raw PCM audio to WAV format
+                import struct
+                sample_rate = 24000
+                num_channels = 1
+                bits_per_sample = 16
+                data_size = len(audio_data)
+                bytes_per_sample = bits_per_sample // 8
+                block_align = num_channels * bytes_per_sample
+                byte_rate = sample_rate * block_align
+                chunk_size = 36 + data_size
+                
+                wav_header = struct.pack(
+                    "<4sI4s4sIHHIIHH4sI",
+                    b"RIFF",
+                    chunk_size,
+                    b"WAVE",
+                    b"fmt ",
+                    16,
+                    1,
+                    num_channels,
+                    sample_rate,
+                    byte_rate,
+                    block_align,
+                    bits_per_sample,
+                    b"data",
+                    data_size
+                )
+                
+                wav_data = wav_header + audio_data
+                
+                return Response(
+                    content=wav_data,
+                    media_type="audio/wav",
+                    headers={
+                        "X-Response-Text": response_text,
+                        "Content-Disposition": "attachment; filename=response.wav"
+                    }
+                )
+            else:
+                return {
+                    "status": "success",
+                    "text": response_text,
+                    "has_audio": False,
+                    "message": "Text sent and response received (no audio)"
+                }
         
     except Exception as e:
         error_logger.error(f"Failed to send text to Live API: {e}")
