@@ -66,6 +66,10 @@ def init_session_state():
         st.session_state.show_thinking = {}
     if "show_sources" not in st.session_state:
         st.session_state.show_sources = {}
+    if "live_language" not in st.session_state:
+        st.session_state.live_language = "en-IN"
+    if "show_live_modal" not in st.session_state:
+        st.session_state.show_live_modal = False
 
 
 def load_chat_history(chat_id: str):
@@ -279,7 +283,18 @@ def main():
             st.info("No recent chats")
     
     # Main chat interface
-    st.title(f"Welcome to Devkraft RAG - Current Model: {st.session_state.model_type.upper()}")
+    # Top bar with title and Talk buttons
+    col1, col2, col3 = st.columns([3, 1, 1])
+    with col1:
+        st.title(f"Welcome to Devkraft RAG - Current Model: {st.session_state.model_type.upper()}")
+    with col2:
+        if st.button("🎤 Talk (English)", key="talk_english", use_container_width=True):
+            st.session_state.live_language = "en-IN"
+            st.session_state.show_live_modal = True
+    with col3:
+        if st.button("🎤 Talk (Hindi)", key="talk_hindi", use_container_width=True):
+            st.session_state.live_language = "hi-IN"
+            st.session_state.show_live_modal = True
     
     # Display chat messages
     for i, message in enumerate(st.session_state.messages):
@@ -333,6 +348,74 @@ def main():
                                 st.error("Failed to generate audio")
                         except Exception as e:
                             st.error(f"Audio generation error: {e}")
+    
+    # Live API Modal
+    if st.session_state.get("show_live_modal", False):
+        st.markdown("---")
+        st.subheader(f"🎤 Live Voice Interaction ({st.session_state.live_language})")
+        
+        st.info("""
+        **Live API Voice Interaction**
+        
+        This feature uses Gemini's Live API for real-time voice conversation.
+        
+        **How to use:**
+        1. Click "Start Session" to begin
+        2. Type your message or speak (audio input coming soon)
+        3. Get real-time audio responses from the AI
+        
+        **Note:** Currently supports text input with audio output. 
+        Full audio input/output requires browser microphone permissions.
+        """)
+        
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("✅ Start Session", key="start_live_session"):
+                with st.spinner("Starting Live API session..."):
+                    try:
+                        response = requests.post(
+                            f"{API_URL}/live/start-session",
+                            json={"language": st.session_state.live_language}
+                        )
+                        if response.status_code == 200:
+                            st.success("Live API session started!")
+                        else:
+                            st.error("Failed to start session")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+        
+        with col2:
+            if st.button("❌ Close", key="close_live_modal"):
+                st.session_state.show_live_modal = False
+                st.rerun()
+        
+        # Text input for Live API
+        live_prompt = st.text_input(
+            "Type your message:",
+            key="live_text_input",
+            placeholder="Enter text to send via Live API..."
+        )
+        
+        if st.button("📤 Send", key="send_live_text"):
+            if live_prompt:
+                with st.spinner("Sending to Live API..."):
+                    try:
+                        response = requests.post(
+                            f"{API_URL}/live/send-text",
+                            json={
+                                "text": live_prompt,
+                                "language": st.session_state.live_language
+                            }
+                        )
+                        if response.status_code == 200:
+                            st.success("Message sent! Audio response will play automatically.")
+                            # TODO: Implement audio playback from Live API response
+                        else:
+                            st.error("Failed to send message")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+        
+        st.markdown("---")
     
     # Chat input
     if prompt := st.chat_input("Ask a question..."):

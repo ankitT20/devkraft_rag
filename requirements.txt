@@ -30,3 +30,9 @@ requests==2.32.3
 aiofiles==24.1.0
 uuid7==0.1.0
 pymongo[srv]>=4.10.0
+
+# Live API dependencies
+opencv-python==4.10.0.84
+pyaudio==0.2.14
+pillow==11.0.0
+mss==10.0.0

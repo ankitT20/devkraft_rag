@@ -20,6 +20,7 @@ from app.models.schemas import (
 from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
 from app.core.tts import TTSService
+from app.core.live_api import LiveAPIService
 from app.utils.logging_config import app_logger, error_logger
 from fastapi.responses import Response, StreamingResponse
 
@@ -43,6 +44,7 @@ app.add_middleware(
 rag_service = RAGService()
 ingestion_service = IngestionService()
 tts_service = TTSService()
+live_api_service = LiveAPIService()
 
 app_logger.info("FastAPI application initialized")
 
@@ -273,6 +275,69 @@ async def text_to_speech(request: dict):
         raise
     except Exception as e:
         error_logger.error(f"TTS endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/live/start-session")
+async def start_live_session(request: dict):
+    """
+    Start a Live API session.
+    
+    Args:
+        request: Dictionary with 'language' field (e.g., 'en-IN', 'hi-IN')
+        
+    Returns:
+        Session ID and status
+    """
+    try:
+        language = request.get("language", "en-IN")
+        app_logger.info(f"Starting Live API session for language: {language}")
+        
+        # For now, return a placeholder response
+        # The actual session management will be handled in the Streamlit UI
+        return {
+            "status": "ready",
+            "language": language,
+            "message": "Live API is ready for connection"
+        }
+        
+    except Exception as e:
+        error_logger.error(f"Failed to start Live API session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/live/send-text")
+async def send_text_to_live(request: dict):
+    """
+    Send text to Live API session.
+    
+    Args:
+        request: Dictionary with 'text' and 'language' fields
+        
+    Returns:
+        Status and response
+    """
+    try:
+        text = request.get("text", "")
+        language = request.get("language", "en-IN")
+        
+        if not text:
+            raise HTTPException(status_code=400, detail="Text field is required")
+        
+        app_logger.info(f"Sending text to Live API: {text[:50]}... (language: {language})")
+        
+        # For now, return a placeholder response
+        # The actual implementation will be handled via WebSocket or streaming
+        return {
+            "status": "sent",
+            "text": text,
+            "language": language
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_logger.error(f"Failed to send text to Live API: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
