@@ -5,7 +5,8 @@
 
 // Configuration
 const API_BASE_URL = 'http://localhost:8000';
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com';
+// Use secure WebSocket base for Live API
+const GEMINI_API_BASE = 'wss://generativelanguage.googleapis.com';
 const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 // Audio Configuration
@@ -103,9 +104,16 @@ async function handleConnect() {
  */
 async function connectToLiveAPI(functionDeclarations) {
     return new Promise((resolve, reject) => {
-        const wsUrl = `${GEMINI_API_BASE}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${ephemeralToken}`;
-        
-        websocket = new WebSocket(wsUrl);
+    // URL-encode the ephemeral token (it may contain slashes) and use a wss:// URL
+    // Use the Constrained endpoint and the `access_token` query parameter when
+    // supplying ephemeral auth tokens (auth_tokens/...).
+    const wsUrl = `${GEMINI_API_BASE}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(ephemeralToken)}`;
+
+    // Debug: log the URL (will contain the ephemeral token) so we can inspect
+    // the exact handshake in the browser console while debugging. Remove in prod.
+    console.debug('Connecting WebSocket to:', wsUrl);
+
+    websocket = new WebSocket(wsUrl);
         
         websocket.onopen = () => {
             console.log('WebSocket connected');
@@ -148,23 +156,54 @@ async function connectToLiveAPI(functionDeclarations) {
         
         websocket.onmessage = async (event) => {
             try {
-                const message = JSON.parse(event.data);
-                console.log('Received message:', message);
-                
-                await handleServerMessage(message);
+                // If server sends text frames, parse JSON and handle as before
+                if (typeof event.data === 'string') {
+                    const message = JSON.parse(event.data);
+                    console.log('Received message (json):', message);
+                    await handleServerMessage(message);
+                    return;
+                }
+
+                // If server sends binary frames (Blob/ArrayBuffer), treat them as audio
+                // and play directly. Avoid JSON.parse on blobs (causes the "[object Blob]" error).
+                let arrayBuffer = null;
+                if (event.data instanceof Blob && event.data.arrayBuffer) {
+                    arrayBuffer = await event.data.arrayBuffer();
+                } else if (event.data instanceof ArrayBuffer) {
+                    arrayBuffer = event.data;
+                } else if (event.data instanceof Uint8Array) {
+                    arrayBuffer = event.data.buffer;
+                }
+
+                if (arrayBuffer) {
+                    // Convert binary audio into base64 so existing playAudioChunk can consume it
+                    const base64 = arrayBufferToBase64(arrayBuffer);
+                    console.log('Received binary audio chunk, playing...');
+                    playAudioChunk(base64);
+                    return;
+                }
+
+                // Unknown type
+                console.warn('Unknown websocket message type received:', event.data);
+
             } catch (error) {
                 console.error('Error handling message:', error);
             }
         };
         
-        websocket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            addTranscriptMessage('error', 'WebSocket error occurred');
-            reject(error);
+        websocket.onerror = (event) => {
+            // event may be an ErrorEvent in browsers
+            console.error('WebSocket error event:', event);
+            addTranscriptMessage('error', `WebSocket error occurred: ${event?.message || 'unknown'}`);
+            // Do not reject here; onclose will follow with details in many cases
         };
-        
-        websocket.onclose = () => {
-            console.log('WebSocket closed');
+
+        websocket.onclose = (event) => {
+            console.log('WebSocket closed', event);
+            // Provide more detailed feedback to the user about why the connection closed
+            const code = event && event.code ? event.code : 'unknown';
+            const reason = event && event.reason ? event.reason : '';
+            addTranscriptMessage('system', `Connection closed (code=${code}) ${reason}`);
             updateStatus('disconnected', 'Disconnected');
             connectBtn.disabled = false;
             micBtn.disabled = true;
