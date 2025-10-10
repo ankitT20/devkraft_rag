@@ -137,45 +137,17 @@ header p {
 .btn-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+    font-size: 1.1em;
+    padding: 18px 40px;
 }
 
 .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
 }
 
-.btn-secondary {
-    background: #4caf50;
-    color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
-}
-
-.btn-secondary.recording {
-    background: #f44336;
-    animation: recordPulse 1.5s infinite;
-}
-
-@keyframes recordPulse {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.05);
-    }
-}
-
-.btn-danger {
-    background: #f44336;
-    color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .btn-link {

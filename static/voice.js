@@ -16,17 +16,15 @@ const RECEIVE_SAMPLE_RATE = 24000;
 // State
 let websocket = null;
 let ephemeralToken = null;
-let mediaRecorder = null;
 let audioContext = null;
 let audioStream = null;
+let isConnected = false;
 let isRecording = false;
-let audioPlaybackQueue = [];
-let isPlaying = false;
+let audioQueueTime = 0;
+let audioProcessor = null;
 
 // UI Elements
 const connectBtn = document.getElementById('connect-btn');
-const micBtn = document.getElementById('mic-btn');
-const disconnectBtn = document.getElementById('disconnect-btn');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const transcript = document.getElementById('transcript');
@@ -35,9 +33,7 @@ const canvasContext = visualizer.getContext('2d');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    connectBtn.addEventListener('click', handleConnect);
-    micBtn.addEventListener('click', handleMicToggle);
-    disconnectBtn.addEventListener('click', handleDisconnect);
+    connectBtn.addEventListener('click', handleConnectToggle);
     
     // Initialize visualizer
     drawVisualizerIdle();
@@ -63,6 +59,17 @@ function addTranscriptMessage(type, content) {
 }
 
 /**
+ * Handle Connect/Disconnect toggle
+ */
+async function handleConnectToggle() {
+    if (!isConnected) {
+        await handleConnect();
+    } else {
+        handleDisconnect();
+    }
+}
+
+/**
  * Handle Connect button
  */
 async function handleConnect() {
@@ -72,6 +79,13 @@ async function handleConnect() {
         
         // Clear transcript
         transcript.innerHTML = '<p class="system-message">Connecting to Live API...</p>';
+        
+        // Initialize audio context first
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: SEND_SAMPLE_RATE
+            });
+        }
         
         // Get ephemeral token from backend
         const tokenResponse = await fetch(`${API_BASE_URL}/api/generate-token`);
@@ -96,6 +110,8 @@ async function handleConnect() {
         addTranscriptMessage('error', `Connection failed: ${error.message}`);
         updateStatus('disconnected', 'Connection failed');
         connectBtn.disabled = false;
+        document.getElementById('connect-icon').textContent = '🔌';
+        document.getElementById('connect-text').textContent = 'Connect & Talk';
     }
 }
 
@@ -146,10 +162,17 @@ async function connectToLiveAPI(functionDeclarations) {
             websocket.send(JSON.stringify(setupMessage));
             
             updateStatus('connected', 'Connected');
-            addTranscriptMessage('system', 'Connected! You can now start talking.');
+            addTranscriptMessage('system', 'Connected! Microphone starting...');
             
-            micBtn.disabled = false;
-            disconnectBtn.disabled = false;
+            isConnected = true;
+            connectBtn.disabled = false;
+            document.getElementById('connect-icon').textContent = '⏹️';
+            document.getElementById('connect-text').textContent = 'Disconnect';
+            
+            // Auto-start recording
+            setTimeout(() => {
+                startRecording();
+            }, 500);
             
             resolve();
         };
@@ -200,14 +223,10 @@ async function connectToLiveAPI(functionDeclarations) {
 
         websocket.onclose = (event) => {
             console.log('WebSocket closed', event);
-            // Provide more detailed feedback to the user about why the connection closed
             const code = event && event.code ? event.code : 'unknown';
             const reason = event && event.reason ? event.reason : '';
             addTranscriptMessage('system', `Connection closed (code=${code}) ${reason}`);
-            updateStatus('disconnected', 'Disconnected');
-            connectBtn.disabled = false;
-            micBtn.disabled = true;
-            disconnectBtn.disabled = true;
+            handleDisconnect();
         };
     });
 }
@@ -323,17 +342,6 @@ async function handleFunctionCall(functionCall) {
 }
 
 /**
- * Handle microphone toggle
- */
-async function handleMicToggle() {
-    if (!isRecording) {
-        await startRecording();
-    } else {
-        stopRecording();
-    }
-}
-
-/**
  * Start audio recording
  */
 async function startRecording() {
@@ -348,15 +356,20 @@ async function startRecording() {
             } 
         });
         
-        // Create audio context for processing
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: SEND_SAMPLE_RATE
-        });
+        // Create audio context for processing if not exists
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: SEND_SAMPLE_RATE
+            });
+        }
         
         const source = audioContext.createMediaStreamSource(audioStream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
         
-        processor.onaudioprocess = (e) => {
+        // Use ScriptProcessorNode (deprecated but widely supported)
+        // TODO: Migrate to AudioWorkletNode when browser support improves
+        audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        
+        audioProcessor.onaudioprocess = (e) => {
             if (!isRecording) return;
             
             const inputData = e.inputBuffer.getChannelData(0);
@@ -380,15 +393,12 @@ async function startRecording() {
             drawVisualizerActive(inputData);
         };
         
-        source.connect(processor);
-        processor.connect(audioContext.destination);
+        source.connect(audioProcessor);
+        audioProcessor.connect(audioContext.destination);
         
         isRecording = true;
-        micBtn.classList.add('recording');
-        document.getElementById('mic-icon').textContent = '🔴';
-        document.getElementById('mic-text').textContent = 'Stop Talking';
-        
-        addTranscriptMessage('system', '🎤 Recording started...');
+        updateStatus('connected', '🎤 Recording...');
+        addTranscriptMessage('system', '🎤 Recording started - speak now!');
         
     } catch (error) {
         console.error('Recording error:', error);
@@ -407,18 +417,12 @@ function stopRecording() {
         audioStream = null;
     }
     
-    if (audioContext) {
-        audioContext.close();
-        audioContext = null;
+    if (audioProcessor) {
+        audioProcessor.disconnect();
+        audioProcessor = null;
     }
     
-    micBtn.classList.remove('recording');
-    document.getElementById('mic-icon').textContent = '🎤';
-    document.getElementById('mic-text').textContent = 'Start Talking';
-    
     drawVisualizerIdle();
-    
-    addTranscriptMessage('system', '🛑 Recording stopped');
 }
 
 /**
@@ -434,14 +438,23 @@ function handleDisconnect() {
         websocket = null;
     }
     
-    stopAudioPlayback();
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+    
+    audioQueueTime = 0;
+    isConnected = false;
+    isRecording = false;
     
     updateStatus('disconnected', 'Disconnected');
     connectBtn.disabled = false;
-    micBtn.disabled = true;
-    disconnectBtn.disabled = true;
+    document.getElementById('connect-icon').textContent = '🔌';
+    document.getElementById('connect-text').textContent = 'Connect & Talk';
     
-    addTranscriptMessage('system', 'Disconnected from Live API');
+    if (!transcript.querySelector('.system-message')) {
+        addTranscriptMessage('system', 'Disconnected from Live API');
+    }
 }
 
 /**
@@ -470,25 +483,15 @@ function arrayBufferToBase64(buffer) {
 
 /**
  * Play audio chunk from model response
+ * Uses queued playback for smooth audio without gaps
  */
 function playAudioChunk(base64Data) {
-    audioPlaybackQueue.push(base64Data);
-    if (!isPlaying) {
-        playNextAudioChunk();
+    if (!audioContext) {
+        // Create playback-only audio context if needed
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: RECEIVE_SAMPLE_RATE
+        });
     }
-}
-
-/**
- * Play next audio chunk from queue
- */
-async function playNextAudioChunk() {
-    if (audioPlaybackQueue.length === 0) {
-        isPlaying = false;
-        return;
-    }
-    
-    isPlaying = true;
-    const base64Data = audioPlaybackQueue.shift();
     
     try {
         // Decode base64 to ArrayBuffer
@@ -498,45 +501,37 @@ async function playNextAudioChunk() {
             bytes[i] = binaryString.charCodeAt(i);
         }
         
-        // Create audio context if not exists
-        if (!audioContext || audioContext.state === 'closed') {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: RECEIVE_SAMPLE_RATE
-            });
-        }
-        
-        // Convert PCM16 to Float32
+        // Convert PCM16 to Float32 for Web Audio API
         const int16Array = new Int16Array(bytes.buffer);
         const float32Array = new Float32Array(int16Array.length);
         for (let i = 0; i < int16Array.length; i++) {
+            // Normalize int16 to [-1, 1] range
             float32Array[i] = int16Array[i] / 32768.0;
         }
         
-        // Create audio buffer
+        // Create audio buffer with correct sample rate
         const audioBuffer = audioContext.createBuffer(1, float32Array.length, RECEIVE_SAMPLE_RATE);
-        audioBuffer.getChannelData(0).set(float32Array);
+        audioBuffer.copyToChannel(float32Array, 0);
         
-        // Play audio
+        // Queue and schedule playback for smooth continuous audio
+        const now = audioContext.currentTime;
+        if (audioQueueTime < now) {
+            audioQueueTime = now;
+        }
+        
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
-        source.onended = () => {
-            playNextAudioChunk();
-        };
-        source.start();
+        source.start(audioQueueTime);
+        
+        // Update queue time for next chunk
+        audioQueueTime += audioBuffer.duration;
+        
+        console.log(`Playing audio chunk: ${float32Array.length} samples, duration: ${audioBuffer.duration}s`);
         
     } catch (error) {
         console.error('Audio playback error:', error);
-        playNextAudioChunk(); // Continue with next chunk
     }
-}
-
-/**
- * Stop audio playback
- */
-function stopAudioPlayback() {
-    audioPlaybackQueue = [];
-    isPlaying = false;
 }
 
 /**
