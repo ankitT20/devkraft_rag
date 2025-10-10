@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎤 Live Voice RAG</title>
+    <link rel="stylesheet" href="/static/voice.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Live Voice RAG</h1>
+            <p>Talk to your documents using AI-powered voice interaction</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Connection Status -->
+            <div class="status-panel">
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Disconnected</span>
+                </div>
+            </div>
+
+            <!-- Voice Visualization -->
+            <div class="voice-visualizer">
+                <canvas id="visualizer" width="800" height="200"></canvas>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button id="connect-btn" class="btn btn-primary">
+                    <span>🔌 Connect</span>
+                </button>
+                <button id="mic-btn" class="btn btn-secondary" disabled>
+                    <span id="mic-icon">🎤</span>
+                    <span id="mic-text">Start Talking</span>
+                </button>
+                <button id="disconnect-btn" class="btn btn-danger" disabled>
+                    <span>⏹️ Disconnect</span>
+                </button>
+            </div>
+
+            <!-- Transcript Display -->
+            <div class="transcript-panel">
+                <h3>Conversation</h3>
+                <div id="transcript" class="transcript-content">
+                    <p class="system-message">Connect to start the conversation...</p>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="navigation">
+                <a href="http://localhost:8501" class="btn btn-link">
+                    ⬅️ Back to RAG
+                </a>
+            </div>
+        </div>
+
+        <footer>
+            <p>Powered by Gemini 2.5 Flash Native Audio • Using Achird voice</p>
+        </footer>
+    </div>
+
+    <script type="module" src="/static/voice.js"></script>
+</body>
+</html>
