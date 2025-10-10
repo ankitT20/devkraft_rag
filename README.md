@@ -42,6 +42,7 @@ devkraft_rag/
 ├── logs/                  # Application logs
 └── requirements.txt       # Dependencies
 ```
+![RAG Architecture](info/DevKraft_RAG_Architecture.png)
 
 ## Setup
 
@@ -178,7 +179,7 @@ Visit http://localhost:8000/docs for interactive API documentation.
 A complete Postman collection is available in the `info/` folder:
 
 1. **Collection**: `info/rag.postman_collection.json` - Contains all API endpoints with pre-filled examples
-2. **Environment**: `info/rag.postman_environment.json` - Environment variables for API keys and configuration
+2. **Environment**: `info/rag.postman_environment.json` - Environment variables for API keys and configuration (Currently API Keys are managed by app\config.py, no need to put in Postman)
 
 To use:
 1. Import both files into Postman
