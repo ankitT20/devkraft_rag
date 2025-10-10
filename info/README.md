@@ -39,6 +39,7 @@ Complete Postman collection with all API endpoints. Includes:
 
 #### `rag.postman_environment.json`
 Environment variables for the Postman collection:
+Currently API Keys are managed by app\config.py, no need to put in Postman
 
 - `base_url` - API base URL (default: `http://localhost:8000`)
 - `gemini_api_key` - Gemini API key (replace `****` with actual key)
