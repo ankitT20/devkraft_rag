@@ -59,3 +59,4 @@ generate_embeddings/stored_in_q_cloud_only/*
 *.tmp
 *.wav
 *.mp3
+*.png
