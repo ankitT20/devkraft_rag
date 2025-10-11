@@ -60,7 +60,18 @@ RESPONSE_MODALITY = "AUDIO"
 
 ## Setup
 
-The voice interface uses the JavaScript SDK (`@google/genai`) loaded via ESM CDN, so no npm install is required. The SDK is automatically loaded from `https://esm.run/@google/genai` in the browser.
+The voice interface uses the JavaScript SDK (`@google/genai`) loaded via ESM CDN from `https://esm.run/@google/genai`, so no npm install is required by default.
+
+**Optional: Local SDK Installation**  
+If you encounter issues with the CDN (e.g., ad blockers or corporate firewalls), you can install the SDK locally:
+```bash
+cd static
+npm install
+```
+Then modify the import in `voice.js` to use the local version:
+```javascript
+import { GoogleGenAI, Modality } from '/static/node_modules/@google/genai/dist/index.mjs';
+```
 
 ## Usage
 

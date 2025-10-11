@@ -1,6 +1,11 @@
 /**
  * Live Voice RAG - JavaScript client for Gemini Live API with native audio
  * Uses JavaScript SDK (@google/genai) with ephemeral tokens for secure authentication
+ * 
+ * Note: The SDK is loaded from esm.run CDN. If you have issues with CDN being blocked,
+ * you can install the SDK locally:
+ *   cd static && npm install
+ * Then change the import to: import { GoogleGenAI, Modality } from '/static/node_modules/@google/genai/dist/index.mjs';
  */
 
 import { GoogleGenAI, Modality } from 'https://esm.run/@google/genai';
