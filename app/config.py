@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "gemini-embedding-001"
     gemini_chat_model: str = "gemini-2.5-flash"
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
+    gemini_live_model: str = "gemini-2.5-flash-native-audio-preview-09-2025"
     local_embedding_model: str = "text-embedding-embeddinggemma-300m-qat"
     local_chat_model: str = "qwen/qwen3-1.7b"
     hf_embedding_model: str = "google/embeddinggemma-300m"
