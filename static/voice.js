@@ -496,13 +496,24 @@ function playAudioChunk(base64Data) {
     try {
         // Decode base64 to ArrayBuffer
         const binaryString = atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         
+        // Ensure buffer length is even for Int16Array (2 bytes per sample)
+        const byteLength = bytes.length - (bytes.length % 2);
+        
+        // Create Int16Array from bytes with proper buffer handling
+        // Use DataView for correct endianness (little-endian for PCM)
+        const int16Array = new Int16Array(byteLength / 2);
+        const dataView = new DataView(bytes.buffer, bytes.byteOffset, byteLength);
+        for (let i = 0; i < int16Array.length; i++) {
+            int16Array[i] = dataView.getInt16(i * 2, true); // true = little-endian
+        }
+        
         // Convert PCM16 to Float32 for Web Audio API
-        const int16Array = new Int16Array(bytes.buffer);
         const float32Array = new Float32Array(int16Array.length);
         for (let i = 0; i < int16Array.length; i++) {
             // Normalize int16 to [-1, 1] range
@@ -527,11 +538,20 @@ function playAudioChunk(base64Data) {
         // Update queue time for next chunk
         audioQueueTime += audioBuffer.duration;
         
-        console.log(`Playing audio chunk: ${float32Array.length} samples, duration: ${audioBuffer.duration}s`);
+        console.log(`Playing audio chunk: ${int16Array.length} samples, duration: ${audioBuffer.duration}s`);
         
     } catch (error) {
         console.error('Audio playback error:', error);
     }
+}
+
+/**
+ * Stop audio playback (for interruptions)
+ */
+function stopAudioPlayback() {
+    // Reset the audio queue time to stop scheduling future chunks
+    audioQueueTime = 0;
+    console.log('Audio playback interrupted');
 }
 
 /**
