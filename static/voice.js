@@ -1,12 +1,12 @@
 /**
  * Live Voice RAG - JavaScript client for Gemini Live API with native audio
- * Uses ephemeral tokens for secure client-side authentication
+ * Uses JavaScript SDK (@google/genai) with ephemeral tokens for secure authentication
  */
+
+import { GoogleGenAI, Modality } from 'https://esm.run/@google/genai';
 
 // Configuration
 const API_BASE_URL = 'http://localhost:8000';
-// Use secure WebSocket base for Live API  
-const GEMINI_API_BASE = 'wss://generativelanguage.googleapis.com';
 const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 // Debug flag
@@ -17,7 +17,7 @@ const SEND_SAMPLE_RATE = 16000;
 const RECEIVE_SAMPLE_RATE = 24000;
 
 // State
-let websocket = null;
+let liveSession = null;
 let ephemeralToken = null;
 let audioContext = null;
 let audioStream = null;
@@ -25,6 +25,7 @@ let isConnected = false;
 let isRecording = false;
 let audioQueueTime = 0;
 let audioProcessor = null;
+let responseQueue = [];
 
 // UI Elements
 const connectBtn = document.getElementById('connect-btn');
@@ -99,13 +100,13 @@ async function handleConnect() {
         const tokenData = await tokenResponse.json();
         ephemeralToken = tokenData.token;
         
-        addTranscriptMessage('system', 'Token obtained, establishing WebSocket connection...');
+        addTranscriptMessage('system', 'Token obtained, connecting with JavaScript SDK...');
         
         // Get function declarations
         const functionsResponse = await fetch(`${API_BASE_URL}/api/function-declarations`);
         const functionsData = await functionsResponse.json();
         
-        // Connect to Gemini Live API using WebSocket
+        // Connect to Gemini Live API using JavaScript SDK
         await connectToLiveAPI(functionsData.functions);
         
     } catch (error) {
@@ -119,171 +120,148 @@ async function handleConnect() {
 }
 
 /**
- * Connect to Gemini Live API via WebSocket
+ * Connect to Gemini Live API using JavaScript SDK
  */
 async function connectToLiveAPI(functionDeclarations) {
-    return new Promise((resolve, reject) => {
-    // URL-encode the ephemeral token (it may contain slashes) and use a wss:// URL
-    // Use the Constrained endpoint and the `access_token` query parameter when
-    // supplying ephemeral auth tokens (auth_tokens/...).
-    const wsUrl = `${GEMINI_API_BASE}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(ephemeralToken)}`;
-
-    // Debug: log the URL (will contain the ephemeral token) so we can inspect
-    // the exact handshake in the browser console while debugging. Remove in prod.
-    console.debug('Connecting WebSocket to:', wsUrl);
-
-    websocket = new WebSocket(wsUrl);
+    try {
+        // Initialize Google GenAI client with ephemeral token
+        const ai = new GoogleGenAI({ apiKey: ephemeralToken });
         
-        websocket.onopen = () => {
-            console.log('WebSocket connected');
-            
-            // Send setup message with native audio configuration
-            const setupMessage = {
-                setup: {
-                    model: `models/${MODEL}`,
-                    generation_config: {
-                        response_modalities: ['AUDIO'],
-                        speech_config: {
-                            voice_config: {
-                                prebuilt_voice_config: {
-                                    voice_name: 'Achird'
-                                }
-                            }
-                        }
-                    },
-                    system_instruction: {
-                        parts: [{
-                            text: "You are a helpful AI assistant with access to a knowledge base. When users ask questions, search the knowledge base using the search_knowledge_base function to find relevant information. Provide accurate, helpful answers based on the retrieved information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
-                        }]
-                    },
-                    tools: functionDeclarations.map(func => ({
-                        function_declarations: [func]
-                    }))
+        // Prepare tools configuration
+        const tools = functionDeclarations.map(func => ({
+            functionDeclarations: [func]
+        }));
+        
+        // Configure session with native audio
+        const config = {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: {
+                        voiceName: 'Achird'
+                    }
                 }
-            };
-            
-            websocket.send(JSON.stringify(setupMessage));
-            
-            updateStatus('connected', 'Connected');
-            addTranscriptMessage('system', 'Connected! Microphone starting...');
-            
-            isConnected = true;
-            connectBtn.disabled = false;
-            document.getElementById('connect-icon').textContent = '⏹️';
-            document.getElementById('connect-text').textContent = 'Disconnect';
-            
-            // Auto-start recording
-            setTimeout(() => {
-                startRecording();
-            }, 500);
-            
-            resolve();
+            },
+            systemInstruction: {
+                parts: [{
+                    text: "You are a helpful AI assistant with access to a knowledge base. When users ask questions, search the knowledge base using the search_knowledge_base function to find relevant information. Provide accurate, helpful answers based on the retrieved information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
+                }]
+            },
+            tools: tools
         };
         
-        websocket.onmessage = async (event) => {
-            try {
-                // If server sends text frames, parse JSON and handle as before
-                if (typeof event.data === 'string') {
-                    const message = JSON.parse(event.data);
-                    console.log('Received message (json):', message);
-                    await handleServerMessage(message);
-                    return;
-                }
-
-                // If server sends binary frames (Blob/ArrayBuffer), treat them as audio
-                // and play directly. Avoid JSON.parse on blobs (causes the "[object Blob]" error).
-                let arrayBuffer = null;
-                if (event.data instanceof Blob && event.data.arrayBuffer) {
-                    arrayBuffer = await event.data.arrayBuffer();
-                } else if (event.data instanceof ArrayBuffer) {
-                    arrayBuffer = event.data;
-                } else if (event.data instanceof Uint8Array) {
-                    arrayBuffer = event.data.buffer;
-                }
-
-                if (arrayBuffer) {
-                    // Convert binary audio into base64 so existing playAudioChunk can consume it
-                    const base64 = arrayBufferToBase64(arrayBuffer);
-                    console.log('Received binary audio chunk, playing...');
-                    playAudioChunk(base64);
-                    return;
-                }
-
-                // Unknown type
-                console.warn('Unknown websocket message type received:', event.data);
-
-            } catch (error) {
-                console.error('Error handling message:', error);
-            }
-        };
+        console.log('Connecting to Live API with JavaScript SDK...');
         
-        websocket.onerror = (event) => {
-            // event may be an ErrorEvent in browsers
-            console.error('WebSocket error event:', event);
-            addTranscriptMessage('error', `WebSocket error occurred: ${event?.message || 'unknown'}`);
-            // Do not reject here; onclose will follow with details in many cases
-        };
-
-        websocket.onclose = (event) => {
-            console.log('WebSocket closed', event);
-            const code = event && event.code ? event.code : 'unknown';
-            const reason = event && event.reason ? event.reason : '';
-            addTranscriptMessage('system', `Connection closed (code=${code}) ${reason}`);
-            handleDisconnect();
-        };
-    });
+        // Connect using SDK with callbacks
+        liveSession = await ai.live.connect({
+            model: MODEL,
+            callbacks: {
+                onopen: function() {
+                    console.log('Live session opened');
+                    updateStatus('connected', 'Connected');
+                    addTranscriptMessage('system', 'Connected! Microphone starting...');
+                    
+                    isConnected = true;
+                    connectBtn.disabled = false;
+                    document.getElementById('connect-icon').textContent = '⏹️';
+                    document.getElementById('connect-text').textContent = 'Disconnect';
+                    
+                    // Auto-start recording
+                    setTimeout(() => {
+                        startRecording();
+                    }, 500);
+                },
+                onmessage: function(message) {
+                    console.log('Received message:', message);
+                    responseQueue.push(message);
+                    handleSDKMessage(message);
+                },
+                onerror: function(error) {
+                    console.error('Live session error:', error);
+                    addTranscriptMessage('error', `Error: ${error.message || 'Unknown error'}`);
+                },
+                onclose: function(event) {
+                    console.log('Live session closed:', event);
+                    const reason = event && event.reason ? event.reason : 'Connection closed';
+                    addTranscriptMessage('system', reason);
+                    handleDisconnect();
+                }
+            },
+            config: config
+        });
+        
+        console.log('Live session connected successfully');
+        
+    } catch (error) {
+        console.error('Failed to connect to Live API:', error);
+        throw error;
+    }
 }
 
 /**
- * Handle messages from the server
+ * Handle messages from the JavaScript SDK
  */
-async function handleServerMessage(message) {
-    // Handle setup complete
-    if (message.setupComplete) {
-        console.log('Setup complete');
-        return;
-    }
-    
-    // Handle server content (model responses)
-    if (message.serverContent) {
-        const content = message.serverContent;
+async function handleSDKMessage(message) {
+    try {
+        // Handle setup complete
+        if (message.setupComplete) {
+            console.log('Setup complete');
+            return;
+        }
         
-        // Handle tool calls
-        if (content.modelTurn && content.modelTurn.parts) {
-            for (const part of content.modelTurn.parts) {
-                // Handle text response
-                if (part.text) {
-                    console.log('Model text:', part.text);
-                    addTranscriptMessage('assistant', part.text);
-                }
-                
-                // Handle function call
-                if (part.functionCall) {
-                    console.log('Function call:', part.functionCall);
-                    await handleFunctionCall(part.functionCall);
-                }
-                
-                // Handle inline audio data
-                if (part.inlineData && part.inlineData.mimeType === 'audio/pcm') {
-                    if (DEBUG_AUDIO) {
-                        console.log('Received audio chunk, mimeType:', part.inlineData.mimeType);
-                        console.log('Audio data length (base64):', part.inlineData.data.length);
+        // Handle server content (model responses)
+        if (message.serverContent) {
+            const content = message.serverContent;
+            
+            // Handle model turn with parts
+            if (content.modelTurn && content.modelTurn.parts) {
+                for (const part of content.modelTurn.parts) {
+                    // Handle text response
+                    if (part.text) {
+                        console.log('Model text:', part.text);
+                        addTranscriptMessage('assistant', part.text);
                     }
-                    playAudioChunk(part.inlineData.data);
+                    
+                    // Handle function call
+                    if (part.functionCall) {
+                        console.log('Function call:', part.functionCall);
+                        await handleFunctionCall(part.functionCall);
+                    }
+                    
+                    // Handle inline audio data
+                    if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith('audio/')) {
+                        if (DEBUG_AUDIO) {
+                            console.log('Received audio chunk, mimeType:', part.inlineData.mimeType);
+                            console.log('Audio data length (base64):', part.inlineData.data.length);
+                        }
+                        playAudioChunk(part.inlineData.data);
+                    }
                 }
+            }
+            
+            // Handle turn complete
+            if (content.turnComplete) {
+                console.log('Turn complete');
+            }
+            
+            // Handle interruption
+            if (content.interrupted) {
+                console.log('Generation interrupted');
+                stopAudioPlayback();
             }
         }
         
-        // Handle turn complete
-        if (content.turnComplete) {
-            console.log('Turn complete');
+        // Handle tool calls (alternative format)
+        if (message.toolCall) {
+            console.log('Tool call message:', message.toolCall);
+            if (message.toolCall.functionCalls) {
+                for (const fc of message.toolCall.functionCalls) {
+                    await handleFunctionCall(fc);
+                }
+            }
         }
-        
-        // Handle interruption
-        if (content.interrupted) {
-            console.log('Generation interrupted');
-            stopAudioPlayback();
-        }
+    } catch (error) {
+        console.error('Error handling SDK message:', error);
     }
 }
 
@@ -311,18 +289,16 @@ async function handleFunctionCall(functionCall) {
         
         const result = await response.json();
         
-        // Send function response back to the model
-        const functionResponse = {
-            toolResponse: {
-                functionResponses: [{
-                    id: id,
-                    name: name,
-                    response: result
-                }]
-            }
-        };
+        // Send function response back to the model using SDK
+        const functionResponses = [{
+            id: id,
+            name: name,
+            response: result
+        }];
         
-        websocket.send(JSON.stringify(functionResponse));
+        if (liveSession && liveSession.sendToolResponse) {
+            await liveSession.sendToolResponse({ functionResponses: functionResponses });
+        }
         
         addTranscriptMessage('system', `✓ Found ${result.count} relevant sources`);
         
@@ -330,19 +306,17 @@ async function handleFunctionCall(functionCall) {
         console.error('Function call error:', error);
         
         // Send error response
-        const errorResponse = {
-            toolResponse: {
-                functionResponses: [{
-                    id: id,
-                    name: name,
-                    response: {
-                        error: error.message
-                    }
-                }]
+        const errorFunctionResponses = [{
+            id: id,
+            name: name,
+            response: {
+                error: error.message
             }
-        };
+        }];
         
-        websocket.send(JSON.stringify(errorResponse));
+        if (liveSession && liveSession.sendToolResponse) {
+            await liveSession.sendToolResponse({ functionResponses: errorFunctionResponses });
+        }
         
         addTranscriptMessage('error', `Function call failed: ${error.message}`);
     }
@@ -382,18 +356,21 @@ async function startRecording() {
             const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = convertToPCM16(inputData);
             
-            // Send audio to Live API
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                const audioMessage = {
-                    realtimeInput: {
-                        mediaChunks: [{
-                            mimeType: 'audio/pcm;rate=16000',
-                            data: arrayBufferToBase64(pcmData)
-                        }]
-                    }
-                };
-                
-                websocket.send(JSON.stringify(audioMessage));
+            // Send audio to Live API using SDK
+            if (liveSession && liveSession.send) {
+                try {
+                    const base64Audio = arrayBufferToBase64(pcmData);
+                    liveSession.send({
+                        realtimeInput: {
+                            mediaChunks: [{
+                                mimeType: 'audio/pcm;rate=16000',
+                                data: base64Audio
+                            }]
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error sending audio:', error);
+                }
             }
             
             // Update visualizer
@@ -440,9 +417,13 @@ function handleDisconnect() {
         stopRecording();
     }
     
-    if (websocket) {
-        websocket.close();
-        websocket = null;
+    if (liveSession) {
+        try {
+            liveSession.close();
+        } catch (error) {
+            console.error('Error closing live session:', error);
+        }
+        liveSession = null;
     }
     
     if (audioContext) {
@@ -453,6 +434,7 @@ function handleDisconnect() {
     audioQueueTime = 0;
     isConnected = false;
     isRecording = false;
+    responseQueue = [];
     
     updateStatus('disconnected', 'Disconnected');
     connectBtn.disabled = false;
