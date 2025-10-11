@@ -35,7 +35,8 @@ The implementation uses a client-to-server architecture where:
 #### Frontend (Static HTML/CSS/JS)
 - **`voice.html`**: Main voice interface page
 - **`voice.css`**: Styling for the voice interface
-- **`voice.js`**: WebSocket client with audio handling
+- **`voice.js`**: JavaScript SDK client (@google/genai) with audio handling
+- **`package.json`**: NPM package configuration for JavaScript SDK
 
 #### Core Services
 - **`app/core/live_api.py`**: LiveAPIService for token management
@@ -57,6 +58,21 @@ RESPONSE_MODALITY = "AUDIO"
 - ❌ Affective Dialog (incompatible with function calling)
 - ❌ Proactive Audio (incompatible with function calling)
 
+## Setup
+
+The voice interface uses the JavaScript SDK (`@google/genai`) loaded via ESM CDN from `https://esm.run/@google/genai`, so no npm install is required by default.
+
+**Optional: Local SDK Installation**  
+If you encounter issues with the CDN (e.g., ad blockers or corporate firewalls), you can install the SDK locally:
+```bash
+cd static
+npm install
+```
+Then modify the import in `voice.js` to use the local version:
+```javascript
+import { GoogleGenAI, Modality } from '/static/node_modules/@google/genai/dist/index.mjs';
+```
+
 ## Usage
 
 ### From Streamlit Interface
@@ -70,8 +86,8 @@ Navigate directly to `http://localhost:8000/voice`
 ### Using the Voice Interface
 
 1. **Connect**: Click the "🔌 Connect" button to establish connection
-   - System generates an ephemeral token
-   - WebSocket connection established with Gemini Live API
+   - System generates an ephemeral token (no API key exposure)
+   - Connection established via JavaScript SDK (@google/genai)
    - Model initialized with RAG function declarations
 
 2. **Start Talking**: Click the "🎤 Start Talking" button

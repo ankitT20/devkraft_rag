@@ -339,10 +339,9 @@ async def search_knowledge_base(request: dict):
         
         app_logger.info(f"RAG search request: query='{query[:50]}...', top_k={top_k}")
         
-        # Use gemini embedding for search
+        # Use gemini embedding for search (cloud storage)
         query_embedding = rag_service.gemini_embedding.embed_query(query)
-        results = rag_service.storage.search(
-            collection_name=settings.qdrant_cloud_collection,
+        results = rag_service.storage.search_cloud(
             query_vector=query_embedding,
             limit=top_k
         )
@@ -350,12 +349,13 @@ async def search_knowledge_base(request: dict):
         # Format results for the Live API
         formatted_results = []
         for result in results:
+            metadata = result.get("metadata", {})
             formatted_results.append({
-                "header": result.payload.get("header", ""),
-                "text": result.payload.get("text", ""),
-                "page": result.payload.get("page", 0),
-                "filename": result.payload.get("filename", ""),
-                "score": result.score
+                "header": metadata.get("header", ""),
+                "text": result.get("text", ""),
+                "page": metadata.get("page", 0),
+                "filename": metadata.get("filename", ""),
+                "score": result.get("score", 0.0)
             })
         
         app_logger.info(f"Found {len(formatted_results)} results for query")
