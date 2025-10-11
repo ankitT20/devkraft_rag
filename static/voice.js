@@ -5,9 +5,12 @@
 
 // Configuration
 const API_BASE_URL = 'http://localhost:8000';
-// Use secure WebSocket base for Live API
+// Use secure WebSocket base for Live API  
 const GEMINI_API_BASE = 'wss://generativelanguage.googleapis.com';
 const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+
+// Debug flag
+const DEBUG_AUDIO = true;
 
 // Audio Configuration
 const SEND_SAMPLE_RATE = 16000;
@@ -262,6 +265,10 @@ async function handleServerMessage(message) {
                 
                 // Handle inline audio data
                 if (part.inlineData && part.inlineData.mimeType === 'audio/pcm') {
+                    if (DEBUG_AUDIO) {
+                        console.log('Received audio chunk, mimeType:', part.inlineData.mimeType);
+                        console.log('Audio data length (base64):', part.inlineData.data.length);
+                    }
                     playAudioChunk(part.inlineData.data);
                 }
             }
@@ -505,13 +512,13 @@ function playAudioChunk(base64Data) {
         // Ensure buffer length is even for Int16Array (2 bytes per sample)
         const byteLength = bytes.length - (bytes.length % 2);
         
-        // Create Int16Array from bytes with proper buffer handling
-        // Use DataView for correct endianness (little-endian for PCM)
-        const int16Array = new Int16Array(byteLength / 2);
-        const dataView = new DataView(bytes.buffer, bytes.byteOffset, byteLength);
-        for (let i = 0; i < int16Array.length; i++) {
-            int16Array[i] = dataView.getInt16(i * 2, true); // true = little-endian
+        if (DEBUG_AUDIO && byteLength !== bytes.length) {
+            console.warn(`Buffer length adjusted from ${bytes.length} to ${byteLength} (odd byte)`);
         }
+        
+        // Create Int16Array directly from the buffer
+        // PCM data from Gemini is always little-endian, which matches most systems
+        const int16Array = new Int16Array(bytes.buffer, bytes.byteOffset, byteLength / 2);
         
         // Convert PCM16 to Float32 for Web Audio API
         const float32Array = new Float32Array(int16Array.length);
@@ -520,7 +527,15 @@ function playAudioChunk(base64Data) {
             float32Array[i] = int16Array[i] / 32768.0;
         }
         
-        // Create audio buffer with correct sample rate
+        if (DEBUG_AUDIO) {
+            // Sample first few values to check if they look reasonable
+            const samples = float32Array.slice(0, 10);
+            console.log('First 10 audio samples:', samples);
+            const max = Math.max(...float32Array.map(Math.abs));
+            console.log('Max amplitude:', max);
+        }
+        
+        // Create audio buffer with correct sample rate (24kHz for output)
         const audioBuffer = audioContext.createBuffer(1, float32Array.length, RECEIVE_SAMPLE_RATE);
         audioBuffer.copyToChannel(float32Array, 0);
         
@@ -538,7 +553,7 @@ function playAudioChunk(base64Data) {
         // Update queue time for next chunk
         audioQueueTime += audioBuffer.duration;
         
-        console.log(`Playing audio chunk: ${int16Array.length} samples, duration: ${audioBuffer.duration}s`);
+        console.log(`Playing audio chunk: ${int16Array.length} samples (${(int16Array.length/RECEIVE_SAMPLE_RATE).toFixed(3)}s), queued at ${audioQueueTime.toFixed(3)}s`);
         
     } catch (error) {
         console.error('Audio playback error:', error);
