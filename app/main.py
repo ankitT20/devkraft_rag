@@ -20,8 +20,10 @@ from app.models.schemas import (
 from app.services.rag import RAGService
 from app.services.ingestion import IngestionService
 from app.core.tts import TTSService
+from app.core.live_api import live_api_service
 from app.utils.logging_config import app_logger, error_logger
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -43,6 +45,12 @@ app.add_middleware(
 rag_service = RAGService()
 ingestion_service = IngestionService()
 tts_service = TTSService()
+
+# Mount static files for voice interface
+import os
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 app_logger.info("FastAPI application initialized")
 
@@ -274,6 +282,109 @@ async def text_to_speech(request: dict):
     except Exception as e:
         error_logger.error(f"TTS endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/generate-token")
+async def generate_token():
+    """
+    Generate an ephemeral token for Live API client-side access.
+    
+    Returns:
+        Token information including the token string and expiry times
+    """
+    try:
+        app_logger.info("Generating ephemeral token for Live API")
+        token_info = live_api_service.generate_ephemeral_token()
+        return token_info
+    except Exception as e:
+        error_logger.error(f"Token generation endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/function-declarations")
+async def get_function_declarations():
+    """
+    Get function declarations for RAG operations in Live API.
+    
+    Returns:
+        List of function declarations
+    """
+    try:
+        return {
+            "functions": live_api_service.get_rag_function_declarations()
+        }
+    except Exception as e:
+        error_logger.error(f"Function declarations endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search-knowledge-base")
+async def search_knowledge_base(request: dict):
+    """
+    Search the knowledge base for relevant information.
+    This is called by the Live API as a tool function.
+    
+    Args:
+        request: Dictionary with 'query' and optional 'top_k'
+        
+    Returns:
+        Search results from the vector database
+    """
+    try:
+        query = request.get("query", "")
+        top_k = request.get("top_k", 3)
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        app_logger.info(f"RAG search request: query='{query[:50]}...', top_k={top_k}")
+        
+        # Use gemini embedding for search (cloud storage)
+        query_embedding = rag_service.gemini_embedding.embed_query(query)
+        results = rag_service.storage.search_cloud(
+            query_vector=query_embedding,
+            limit=top_k
+        )
+        
+        # Format results for the Live API
+        formatted_results = []
+        for result in results:
+            metadata = result.get("metadata", {})
+            formatted_results.append({
+                "header": metadata.get("header", ""),
+                "text": result.get("text", ""),
+                "page": metadata.get("page", 0),
+                "filename": metadata.get("filename", ""),
+                "score": result.get("score", 0.0)
+            })
+        
+        app_logger.info(f"Found {len(formatted_results)} results for query")
+        
+        return {
+            "results": formatted_results,
+            "count": len(formatted_results)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_logger.error(f"Search knowledge base endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/voice")
+async def voice_interface():
+    """
+    Serve the voice interface HTML page.
+    
+    Returns:
+        HTML page for voice interaction
+    """
+    voice_html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "voice.html")
+    if os.path.exists(voice_html_path):
+        return FileResponse(voice_html_path)
+    else:
+        raise HTTPException(status_code=404, detail="Voice interface not found")
 
 
 if __name__ == "__main__":

@@ -202,6 +202,28 @@ def main():
     with st.sidebar:
         st.title("🤖 DevKraft RAG")
         
+        # Live Voice Call button
+        st.markdown("### 🎤 Live Voice RAG")
+        st.markdown("""
+        <a href="http://localhost:8000/voice" target="_blank" style="
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            width: 100%;
+            margin-bottom: 1rem;
+        ">
+            🎤 Start Live Voice Call
+        </a>
+        """, unsafe_allow_html=True)
+        st.caption("Talk to your documents using AI voice")
+        
+        st.markdown("---")
+        
         # Model selection
         st.subheader("Model Selection")
         model_options = {
