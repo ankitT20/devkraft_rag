@@ -32,7 +32,7 @@ const RECEIVE_SAMPLE_RATE = 24000;
 
 // Voice Activity Detection (VAD) threshold for client-side interruption
 // Adjust this value if needed (higher = less sensitive, lower = more sensitive)
-const VAD_THRESHOLD = 0.01;
+const VAD_THRESHOLD = 0.05;
 
 // State
 let liveSession = null;
@@ -166,7 +166,7 @@ async function connectToLiveAPI(functionDeclarations) {
             },
             systemInstruction: {
                 parts: [{
-                    text: "You are a helpful AI assistant with access to a knowledge base. When users ask questions, search the knowledge base using the search_knowledge_base function to find relevant information. Provide accurate, helpful answers based on the retrieved information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
+                    text: "You are a helpful AI assistant with access to an external knowledge base. When users ask questions, Always search the knowledge base using the search_knowledge_base function to find relevant information. Provide accurate, helpful answers based on the retrieved information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
                 }]
             },
             tools: tools
