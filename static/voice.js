@@ -2,6 +2,9 @@
  * Live Voice RAG - JavaScript client for Gemini Live API with native audio
  * Uses JavaScript SDK (@google/genai) with ephemeral tokens for secure authentication
  * 
+ * IMPORTANT: Ephemeral tokens require v1alpha API version. Initialize client with:
+ *   new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } })
+ * 
  * Note: The SDK is loaded from esm.run CDN. If you have issues with CDN being blocked,
  * you can install the SDK locally:
  *   cd static && npm install
@@ -130,7 +133,11 @@ async function handleConnect() {
 async function connectToLiveAPI(functionDeclarations) {
     try {
         // Initialize Google GenAI client with ephemeral token
-        const ai = new GoogleGenAI({ apiKey: ephemeralToken });
+        // Must use v1alpha for ephemeral token support
+        const ai = new GoogleGenAI({ 
+            apiKey: ephemeralToken,
+            httpOptions: { apiVersion: 'v1alpha' }
+        });
         
         // Prepare tools configuration
         const tools = functionDeclarations.map(func => ({

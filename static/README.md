@@ -18,9 +18,15 @@ The voice interface uses the `@google/genai` JavaScript SDK to connect directly 
 By default, the SDK is loaded from the ESM CDN:
 ```javascript
 import { GoogleGenAI, Modality } from 'https://esm.run/@google/genai';
+
+// Initialize with v1alpha for ephemeral token support (required)
+const ai = new GoogleGenAI({ 
+    apiKey: ephemeralToken,
+    httpOptions: { apiVersion: 'v1alpha' }
+});
 ```
 
-This requires no setup and works in most browsers.
+This requires no setup and works in most browsers. **Important**: The `v1alpha` API version is required for ephemeral token authentication.
 
 ### Alternative: Local Installation
 

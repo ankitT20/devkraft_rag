@@ -44,6 +44,13 @@ Successfully migrated the Live Voice RAG feature from raw WebSocket implementati
 - SDK handles WebSocket connection automatically
 - Callbacks for connection lifecycle (onopen, onmessage, onerror, onclose)
 - Built-in message handling and serialization
+- **Important**: Requires `v1alpha` API version for ephemeral token support
+  ```javascript
+  const ai = new GoogleGenAI({ 
+      apiKey: ephemeralToken,
+      httpOptions: { apiVersion: 'v1alpha' }
+  });
+  ```
 
 ### 3. RAG Function Calling ✅
 - Model can call `search_knowledge_base` function
