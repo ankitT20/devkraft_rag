@@ -362,7 +362,8 @@ async function startRecording() {
     try {
         console.log('[INPUT] Starting recording...');
         console.log('[INPUT] Live session available:', !!liveSession);
-        console.log('[INPUT] Live session send method:', !!liveSession?.send);
+        console.log('[INPUT] sendRealtimeInput method:', !!liveSession?.sendRealtimeInput);
+        console.log('[INPUT] sendToolResponse method:', !!liveSession?.sendToolResponse);
         
         // Request microphone access
         audioStream = await navigator.mediaDevices.getUserMedia({ 
@@ -402,29 +403,30 @@ async function startRecording() {
             const rms = Math.sqrt(inputData.reduce((sum, val) => sum + val * val, 0) / inputData.length);
             
             // Send audio to Live API using SDK
-            if (liveSession && liveSession.send) {
+            if (liveSession && liveSession.sendRealtimeInput) {
                 try {
                     const base64Audio = arrayBufferToBase64(pcmData);
-                    liveSession.send({
-                        realtimeInput: {
-                            mediaChunks: [{
-                                mimeType: 'audio/pcm;rate=16000',
-                                data: base64Audio
-                            }]
+                    liveSession.sendRealtimeInput({
+                        audio: {
+                            data: base64Audio,
+                            mimeType: 'audio/pcm;rate=16000'
                         }
                     });
                     audioChunksSent++;
                     
                     // Log every 50 chunks (roughly every 3 seconds)
                     if (audioChunksSent % 50 === 0) {
-                        console.log(`[INPUT] Sent ${audioChunksSent} audio chunks, RMS level: ${rms.toFixed(4)}`);
+                        console.log(`[INPUT] ✓ Sent ${audioChunksSent} audio chunks, RMS level: ${rms.toFixed(4)}`);
                     }
                 } catch (error) {
                     console.error('[INPUT] ✗ Error sending audio:', error);
+                    console.error('[INPUT] Error details:', error.stack);
                 }
             } else {
                 if (audioChunksSent === 0) {
-                    console.error('[INPUT] ✗ Cannot send audio - liveSession or send method not available');
+                    console.error('[INPUT] ✗ Cannot send audio - liveSession or sendRealtimeInput method not available');
+                    console.error('[INPUT] liveSession exists:', !!liveSession);
+                    console.error('[INPUT] Available methods:', liveSession ? Object.keys(liveSession) : 'none');
                 }
             }
             
