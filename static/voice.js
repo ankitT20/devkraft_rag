@@ -5,6 +5,12 @@
  * IMPORTANT: Ephemeral tokens require v1alpha API version. Initialize client with:
  *   new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } })
  * 
+ * VOICE ACTIVITY DETECTION (VAD):
+ *   - Automatic VAD is enabled by default (Gemini handles interruption detection)
+ *   - Client-side VAD threshold (VAD_THRESHOLD) detects user speech to stop local playback
+ *   - This prevents audio overlap when user interrupts the model
+ *   - Server-side VAD handles the model's response to interruptions
+ * 
  * Note: The SDK is loaded from esm.run CDN. If you have issues with CDN being blocked,
  * you can install the SDK locally:
  *   cd static && npm install
@@ -23,6 +29,10 @@ const DEBUG_AUDIO = true;
 // Audio Configuration
 const SEND_SAMPLE_RATE = 16000;
 const RECEIVE_SAMPLE_RATE = 24000;
+
+// Voice Activity Detection (VAD) threshold for client-side interruption
+// Adjust this value if needed (higher = less sensitive, lower = more sensitive)
+const VAD_THRESHOLD = 0.01;
 
 // State
 let liveSession = null;
@@ -234,9 +244,15 @@ async function handleSDKMessage(message) {
             const content = message.serverContent;
             console.log('[MSG] Server content keys:', Object.keys(content));
             
+            // Check if model is starting to think/generate
+            if (content.modelTurn && !content.modelTurn.parts) {
+                console.log('[THINKING] 💭 Model is thinking...');
+            }
+            
             // Handle model turn with parts
             if (content.modelTurn && content.modelTurn.parts) {
                 console.log('[MSG] Model turn with', content.modelTurn.parts.length, 'parts');
+                console.log('[THINKING] ✓ Model generated response');
                 for (const part of content.modelTurn.parts) {
                     console.log('[MSG] Part type:', Object.keys(part));
                     
@@ -304,7 +320,10 @@ async function handleSDKMessage(message) {
 async function handleFunctionCall(functionCall) {
     const { name, args, id } = functionCall;
     
-    addTranscriptMessage('system', `🔍 Searching knowledge base...`);
+    // Display the search query in transcript
+    const query = args.query || 'knowledge base';
+    addTranscriptMessage('system', `🔍 Searching knowledge base for: "${query}"`);
+    console.log('[FUNCTION] Search query:', query);
     
     try {
         // Call our backend API to execute the function
@@ -393,6 +412,8 @@ async function startRecording() {
         audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
         
         let audioChunksSent = 0;
+        let userSpeakingDetected = false;
+        
         audioProcessor.onaudioprocess = (e) => {
             if (!isRecording) return;
             
@@ -401,6 +422,19 @@ async function startRecording() {
             
             // Calculate audio level for monitoring
             const rms = Math.sqrt(inputData.reduce((sum, val) => sum + val * val, 0) / inputData.length);
+            
+            // Detect if user is speaking (simple threshold-based detection)
+            const isSpeaking = rms > VAD_THRESHOLD;
+            
+            // If user starts speaking, stop any ongoing audio playback (interruption)
+            if (isSpeaking && !userSpeakingDetected) {
+                userSpeakingDetected = true;
+                stopAudioPlayback();
+                console.log('[INPUT] 🎤 User speaking detected - interrupting playback');
+            } else if (!isSpeaking && userSpeakingDetected) {
+                userSpeakingDetected = false;
+                console.log('[INPUT] 🔇 User stopped speaking');
+            }
             
             // Send audio to Live API using SDK
             if (liveSession && liveSession.sendRealtimeInput) {
@@ -609,6 +643,20 @@ function playAudioChunk(base64Data) {
         source.connect(audioContext.destination);
         source.start(audioQueueTime);
         
+        // Track active sources for interruption
+        if (!window.activeSources) {
+            window.activeSources = [];
+        }
+        window.activeSources.push(source);
+        
+        // Clean up when done
+        source.onended = () => {
+            const index = window.activeSources.indexOf(source);
+            if (index > -1) {
+                window.activeSources.splice(index, 1);
+            }
+        };
+        
         // Update queue time for next chunk
         audioQueueTime += audioBuffer.duration;
         
@@ -622,11 +670,25 @@ function playAudioChunk(base64Data) {
 
 /**
  * Stop audio playback (for interruptions)
+ * This handles user interruptions to prevent overlapping audio
  */
 function stopAudioPlayback() {
+    // Stop all currently playing audio sources
+    if (window.activeSources && window.activeSources.length > 0) {
+        console.log(`[OUTPUT] ⏹️ Stopping ${window.activeSources.length} active audio sources`);
+        window.activeSources.forEach(source => {
+            try {
+                source.stop();
+            } catch (e) {
+                // Source may have already stopped
+            }
+        });
+        window.activeSources = [];
+    }
+    
     // Reset the audio queue time to stop scheduling future chunks
     audioQueueTime = 0;
-    console.log('Audio playback interrupted');
+    console.log('[OUTPUT] ✓ Audio playback interrupted and cleared');
 }
 
 /**
