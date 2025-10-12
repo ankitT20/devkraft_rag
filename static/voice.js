@@ -184,17 +184,23 @@ async function connectToLiveAPI(functionDeclarations) {
                     }, 500);
                 },
                 onmessage: function(message) {
-                    console.log('Received message:', message);
+                    console.log('[SDK] Received message:', message);
+                    console.log('[SDK] Message type:', Object.keys(message));
                     responseQueue.push(message);
                     handleSDKMessage(message);
                 },
                 onerror: function(error) {
-                    console.error('Live session error:', error);
+                    console.error('[SDK] Live session error:', error);
+                    console.error('[SDK] Error type:', typeof error);
+                    console.error('[SDK] Error details:', JSON.stringify(error, null, 2));
                     addTranscriptMessage('error', `Error: ${error.message || 'Unknown error'}`);
                 },
                 onclose: function(event) {
-                    console.log('Live session closed:', event);
-                    const reason = event && event.reason ? event.reason : 'Connection closed';
+                    console.log('[SDK] Live session closed:', event);
+                    console.log('[SDK] Close code:', event?.code);
+                    console.log('[SDK] Close reason:', event?.reason);
+                    console.log('[SDK] Was clean:', event?.wasClean);
+                    const reason = event && event.reason ? event.reason : `Connection closed (code: ${event?.code})`;
                     addTranscriptMessage('system', reason);
                     handleDisconnect();
                 }
@@ -215,65 +221,80 @@ async function connectToLiveAPI(functionDeclarations) {
  */
 async function handleSDKMessage(message) {
     try {
+        console.log('[MSG] Processing message type:', Object.keys(message));
+        
         // Handle setup complete
         if (message.setupComplete) {
-            console.log('Setup complete');
+            console.log('[MSG] ✓ Setup complete');
             return;
         }
         
         // Handle server content (model responses)
         if (message.serverContent) {
             const content = message.serverContent;
+            console.log('[MSG] Server content keys:', Object.keys(content));
             
             // Handle model turn with parts
             if (content.modelTurn && content.modelTurn.parts) {
+                console.log('[MSG] Model turn with', content.modelTurn.parts.length, 'parts');
                 for (const part of content.modelTurn.parts) {
+                    console.log('[MSG] Part type:', Object.keys(part));
+                    
                     // Handle text response
                     if (part.text) {
-                        console.log('Model text:', part.text);
+                        console.log('[MSG] ✓ Model text:', part.text);
                         addTranscriptMessage('assistant', part.text);
                     }
                     
                     // Handle function call
                     if (part.functionCall) {
-                        console.log('Function call:', part.functionCall);
+                        console.log('[MSG] ✓ Function call:', part.functionCall);
                         await handleFunctionCall(part.functionCall);
                     }
                     
                     // Handle inline audio data
                     if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith('audio/')) {
-                        if (DEBUG_AUDIO) {
-                            console.log('Received audio chunk, mimeType:', part.inlineData.mimeType);
-                            console.log('Audio data length (base64):', part.inlineData.data.length);
-                        }
+                        console.log('[AUDIO] ✓ Received audio chunk');
+                        console.log('[AUDIO] mimeType:', part.inlineData.mimeType);
+                        console.log('[AUDIO] data length (base64):', part.inlineData.data.length);
                         playAudioChunk(part.inlineData.data);
+                    } else if (part.inlineData) {
+                        console.log('[MSG] InlineData without audio, mimeType:', part.inlineData.mimeType);
                     }
                 }
+            } else {
+                console.log('[MSG] No modelTurn or parts in serverContent');
             }
             
             // Handle turn complete
             if (content.turnComplete) {
-                console.log('Turn complete');
+                console.log('[MSG] ✓ Turn complete');
             }
             
             // Handle interruption
             if (content.interrupted) {
-                console.log('Generation interrupted');
+                console.log('[MSG] ⚠ Generation interrupted');
                 stopAudioPlayback();
             }
         }
         
         // Handle tool calls (alternative format)
         if (message.toolCall) {
-            console.log('Tool call message:', message.toolCall);
+            console.log('[MSG] ✓ Tool call message:', message.toolCall);
             if (message.toolCall.functionCalls) {
                 for (const fc of message.toolCall.functionCalls) {
                     await handleFunctionCall(fc);
                 }
             }
         }
+        
+        // Check if message is empty
+        if (!message.setupComplete && !message.serverContent && !message.toolCall) {
+            console.warn('[MSG] ⚠ Received message with no recognized content');
+        }
     } catch (error) {
-        console.error('Error handling SDK message:', error);
+        console.error('[MSG] ✗ Error handling SDK message:', error);
+        console.error('[MSG] Error stack:', error.stack);
     }
 }
 
@@ -339,6 +360,10 @@ async function handleFunctionCall(functionCall) {
  */
 async function startRecording() {
     try {
+        console.log('[INPUT] Starting recording...');
+        console.log('[INPUT] Live session available:', !!liveSession);
+        console.log('[INPUT] Live session send method:', !!liveSession?.send);
+        
         // Request microphone access
         audioStream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
@@ -349,11 +374,15 @@ async function startRecording() {
             } 
         });
         
+        console.log('[INPUT] ✓ Microphone access granted');
+        console.log('[INPUT] Audio tracks:', audioStream.getAudioTracks().length);
+        
         // Create audio context for processing if not exists
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)({
                 sampleRate: SEND_SAMPLE_RATE
             });
+            console.log('[INPUT] Created audio context');
         }
         
         const source = audioContext.createMediaStreamSource(audioStream);
@@ -362,11 +391,15 @@ async function startRecording() {
         // TODO: Migrate to AudioWorkletNode when browser support improves
         audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
         
+        let audioChunksSent = 0;
         audioProcessor.onaudioprocess = (e) => {
             if (!isRecording) return;
             
             const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = convertToPCM16(inputData);
+            
+            // Calculate audio level for monitoring
+            const rms = Math.sqrt(inputData.reduce((sum, val) => sum + val * val, 0) / inputData.length);
             
             // Send audio to Live API using SDK
             if (liveSession && liveSession.send) {
@@ -380,8 +413,18 @@ async function startRecording() {
                             }]
                         }
                     });
+                    audioChunksSent++;
+                    
+                    // Log every 50 chunks (roughly every 3 seconds)
+                    if (audioChunksSent % 50 === 0) {
+                        console.log(`[INPUT] Sent ${audioChunksSent} audio chunks, RMS level: ${rms.toFixed(4)}`);
+                    }
                 } catch (error) {
-                    console.error('Error sending audio:', error);
+                    console.error('[INPUT] ✗ Error sending audio:', error);
+                }
+            } else {
+                if (audioChunksSent === 0) {
+                    console.error('[INPUT] ✗ Cannot send audio - liveSession or send method not available');
                 }
             }
             
@@ -396,8 +439,12 @@ async function startRecording() {
         updateStatus('connected', '🎤 Recording...');
         addTranscriptMessage('system', '🎤 Recording started - speak now!');
         
+        console.log('[INPUT] ✓ Recording pipeline established');
+        console.log('[INPUT] Audio processing started, will send chunks to Live API');
+        
     } catch (error) {
-        console.error('Recording error:', error);
+        console.error('[INPUT] ✗ Recording error:', error);
+        console.error('[INPUT] Error stack:', error.stack);
         addTranscriptMessage('error', `Microphone access failed: ${error.message}`);
     }
 }
@@ -425,6 +472,10 @@ function stopRecording() {
  * Handle disconnect
  */
 function handleDisconnect() {
+    console.log('[DISCONNECT] Starting disconnect process');
+    console.log('[DISCONNECT] isRecording:', isRecording);
+    console.log('[DISCONNECT] liveSession exists:', !!liveSession);
+    
     if (isRecording) {
         stopRecording();
     }
@@ -432,8 +483,9 @@ function handleDisconnect() {
     if (liveSession) {
         try {
             liveSession.close();
+            console.log('[DISCONNECT] ✓ Live session closed');
         } catch (error) {
-            console.error('Error closing live session:', error);
+            console.error('[DISCONNECT] ✗ Error closing live session:', error);
         }
         liveSession = null;
     }
@@ -441,6 +493,7 @@ function handleDisconnect() {
     if (audioContext) {
         audioContext.close();
         audioContext = null;
+        console.log('[DISCONNECT] ✓ Audio context closed');
     }
     
     audioQueueTime = 0;
@@ -456,6 +509,8 @@ function handleDisconnect() {
     if (!transcript.querySelector('.system-message')) {
         addTranscriptMessage('system', 'Disconnected from Live API');
     }
+    
+    console.log('[DISCONNECT] ✓ Disconnect complete');
 }
 
 /**
@@ -487,11 +542,14 @@ function arrayBufferToBase64(buffer) {
  * Uses queued playback for smooth audio without gaps
  */
 function playAudioChunk(base64Data) {
+    console.log('[OUTPUT] ✓ playAudioChunk called, base64 length:', base64Data.length);
+    
     if (!audioContext) {
         // Create playback-only audio context if needed
         audioContext = new (window.AudioContext || window.webkitAudioContext)({
             sampleRate: RECEIVE_SAMPLE_RATE
         });
+        console.log('[OUTPUT] Created new audio context for playback');
     }
     
     try {
@@ -503,11 +561,13 @@ function playAudioChunk(base64Data) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         
+        console.log('[OUTPUT] Decoded audio bytes:', bytes.length);
+        
         // Ensure buffer length is even for Int16Array (2 bytes per sample)
         const byteLength = bytes.length - (bytes.length % 2);
         
-        if (DEBUG_AUDIO && byteLength !== bytes.length) {
-            console.warn(`Buffer length adjusted from ${bytes.length} to ${byteLength} (odd byte)`);
+        if (byteLength !== bytes.length) {
+            console.warn(`[OUTPUT] ⚠ Buffer length adjusted from ${bytes.length} to ${byteLength} (odd byte)`);
         }
         
         // Create Int16Array directly from the buffer
@@ -521,12 +581,15 @@ function playAudioChunk(base64Data) {
             float32Array[i] = int16Array[i] / 32768.0;
         }
         
-        if (DEBUG_AUDIO) {
-            // Sample first few values to check if they look reasonable
-            const samples = float32Array.slice(0, 10);
-            console.log('First 10 audio samples:', samples);
-            const max = Math.max(...float32Array.map(Math.abs));
-            console.log('Max amplitude:', max);
+        // Sample first few values to check if they look reasonable
+        const samples = float32Array.slice(0, 10);
+        console.log('[OUTPUT] First 10 audio samples:', samples);
+        const max = Math.max(...float32Array.map(Math.abs));
+        const rms = Math.sqrt(float32Array.reduce((sum, val) => sum + val * val, 0) / float32Array.length);
+        console.log('[OUTPUT] Max amplitude:', max, ', RMS:', rms);
+        
+        if (max === 0) {
+            console.warn('[OUTPUT] ⚠ Audio buffer is silent (all zeros)');
         }
         
         // Create audio buffer with correct sample rate (24kHz for output)
@@ -547,10 +610,11 @@ function playAudioChunk(base64Data) {
         // Update queue time for next chunk
         audioQueueTime += audioBuffer.duration;
         
-        console.log(`Playing audio chunk: ${int16Array.length} samples (${(int16Array.length/RECEIVE_SAMPLE_RATE).toFixed(3)}s), queued at ${audioQueueTime.toFixed(3)}s`);
+        console.log(`[OUTPUT] ✓ Playing audio: ${int16Array.length} samples (${(int16Array.length/RECEIVE_SAMPLE_RATE).toFixed(3)}s), queued at ${audioQueueTime.toFixed(3)}s`);
         
     } catch (error) {
-        console.error('Audio playback error:', error);
+        console.error('[OUTPUT] ✗ Audio playback error:', error);
+        console.error('[OUTPUT] Error stack:', error.stack);
     }
 }
 
