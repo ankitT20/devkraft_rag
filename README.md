@@ -252,17 +252,11 @@ Logs are appended when the application is restarted multiple times on the same d
 
 ## Document Processing
 
-### Text Preprocessing
-Documents are automatically cleaned and standardized before chunking:
-- Removes excessive whitespace and multiple newlines
-- Removes common headers/footers and page numbers
-- Standardizes formatting for better chunking
-
 ### Chunking Strategy
-- **Primary**: Semantic chunking using LangChain SemanticChunker with Gemini embeddings
-- **Fallback**: RecursiveCharacterTextSplitter when semantic chunking is unavailable
-- **Chunk Size**: 1500 characters (for recursive splitter)
-- **Overlap**: 300 characters (for recursive splitter)
+- **Method**: RecursiveCharacterTextSplitter with LangChain
+- **Chunk Size**: 1500 characters
+- **Overlap**: 300 characters
+- **Note**: Semantic chunking is available but disabled by default to avoid consuming API quota
 
 ### Supported Formats
 - **Documents**: TXT, PDF, DOCX, MD, CSV

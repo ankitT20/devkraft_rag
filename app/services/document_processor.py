@@ -7,7 +7,6 @@ import hashlib
 from pathlib import Path
 from typing import List, Dict, Tuple
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_experimental.text_splitter import SemanticChunker
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
@@ -16,7 +15,6 @@ from langchain_community.document_loaders import (
     CSVLoader,
     WebBaseLoader
 )
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.config import settings
 from app.utils.logging_config import app_logger, error_logger
@@ -27,11 +25,12 @@ class DocumentProcessor:
     Service for loading and chunking documents using LangChain.
     """
     
-    def __init__(self, use_semantic_chunking: bool = True):
+    def __init__(self, use_semantic_chunking: bool = False):
         """Initialize document processor with text splitter.
         
         Args:
-            use_semantic_chunking: Whether to use semantic chunking (default: True)
+            use_semantic_chunking: Whether to use semantic chunking (default: False)
+                                  Note: Semantic chunking uses Gemini API calls which consume quota
         """
         self.use_semantic_chunking = use_semantic_chunking
         
@@ -44,9 +43,13 @@ class DocumentProcessor:
         )
         
         # Initialize SemanticChunker if enabled and API key is available
+        # Note: Semantic chunking is disabled by default to avoid consuming API quota
         self.semantic_splitter = None
         if use_semantic_chunking and settings.gemini_api_key:
             try:
+                from langchain_experimental.text_splitter import SemanticChunker
+                from langchain_google_genai import GoogleGenerativeAIEmbeddings
+                
                 embeddings = GoogleGenerativeAIEmbeddings(
                     model=settings.gemini_embedding_model,
                     google_api_key=settings.gemini_api_key,
@@ -124,29 +127,13 @@ class DocumentProcessor:
             # Load documents
             documents = loader.load()
             
-            # Preprocess documents
-            for doc in documents:
-                doc.page_content = self._preprocess_text(doc.page_content)
-            
             # For PDFs, preserve page information
             if file_ext == ".pdf":
                 chunks, chunk_metadata = self._process_pdf_with_metadata(documents, file_path)
             else:
-                # For non-PDF documents, use semantic or recursive chunking
+                # For non-PDF documents, use simple chunking
                 full_text = "\n\n".join([doc.page_content for doc in documents])
-                
-                # Use semantic chunking if available
-                if self.semantic_splitter:
-                    try:
-                        semantic_docs = self.semantic_splitter.create_documents([full_text])
-                        chunks = [doc.page_content for doc in semantic_docs]
-                        app_logger.info(f"Used semantic chunking for {file_path}")
-                    except Exception as e:
-                        error_logger.warning(f"Semantic chunking failed, falling back to recursive: {e}")
-                        chunks = self.text_splitter.split_text(full_text)
-                else:
-                    chunks = self.text_splitter.split_text(full_text)
-                
+                chunks = self.text_splitter.split_text(full_text)
                 chunk_metadata = []
                 for i in range(len(chunks)):
                     chunk_metadata.append({
@@ -181,24 +168,11 @@ class DocumentProcessor:
             loader = WebBaseLoader(url)
             documents = loader.load()
             
-            # Preprocess documents
-            for doc in documents:
-                doc.page_content = self._preprocess_text(doc.page_content)
-            
             # Combine all documents
             full_text = "\n\n".join([doc.page_content for doc in documents])
             
-            # Use semantic chunking if available
-            if self.semantic_splitter:
-                try:
-                    semantic_docs = self.semantic_splitter.create_documents([full_text])
-                    chunks = [doc.page_content for doc in semantic_docs]
-                    app_logger.info(f"Used semantic chunking for website {url}")
-                except Exception as e:
-                    error_logger.warning(f"Semantic chunking failed, falling back to recursive: {e}")
-                    chunks = self.text_splitter.split_text(full_text)
-            else:
-                chunks = self.text_splitter.split_text(full_text)
+            # Use recursive chunking
+            chunks = self.text_splitter.split_text(full_text)
             
             # Create metadata for each chunk
             chunk_metadata = []
@@ -245,16 +219,8 @@ class DocumentProcessor:
             if not header:
                 header = f"Page {page_num}"
             
-            # Split page content into chunks using semantic or recursive splitter
-            if self.semantic_splitter:
-                try:
-                    semantic_docs = self.semantic_splitter.create_documents([page_content])
-                    page_chunks = [doc.page_content for doc in semantic_docs]
-                except Exception as e:
-                    error_logger.warning(f"Semantic chunking failed for page {page_num}, using recursive: {e}")
-                    page_chunks = self.text_splitter.split_text(page_content)
-            else:
-                page_chunks = self.text_splitter.split_text(page_content)
+            # Split page content into chunks
+            page_chunks = self.text_splitter.split_text(page_content)
             
             # Associate each chunk with the page number and header
             for chunk in page_chunks:
