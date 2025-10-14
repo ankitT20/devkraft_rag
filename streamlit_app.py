@@ -193,6 +193,28 @@ def upload_document(file):
     return None
 
 
+def ingest_website(url):
+    """Ingest content from a website URL."""
+    try:
+        logger.info(f"Ingesting website: {url}")
+        response = requests.post(
+            f"{API_URL}/ingest-website",
+            json={"url": url},
+            timeout=60
+        )
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"Website ingested successfully: {url}")
+            return result
+        else:
+            logger.error(f"Ingest error: {response.status_code}")
+            st.error(f"Ingest error: {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to ingest website {url}: {e}")
+        st.error(f"Failed to ingest website: {e}")
+    return None
+
+
 def main():
     """Main Streamlit application."""
     logger.info("Starting main Streamlit application")
@@ -266,6 +288,28 @@ def main():
                             st.success(f"✅ {result['message']}")
                         else:
                             st.error(f"❌ {result['message']}")
+        
+        st.markdown("---")
+        
+        # Website URL ingestion
+        st.subheader("🌐 Ingest Website")
+        website_url = st.text_input(
+            "Enter website URL",
+            placeholder="https://example.com",
+            help="Enter a website URL to ingest its content"
+        )
+        
+        if st.button("➕ Ingest Website", key="ingest_website_btn"):
+            if website_url:
+                with st.spinner("Ingesting website content..."):
+                    result = ingest_website(website_url)
+                    if result:
+                        if result["success"]:
+                            st.success(f"✅ {result['message']}")
+                        else:
+                            st.error(f"❌ {result['message']}")
+            else:
+                st.warning("⚠️ Please enter a website URL")
         
         st.markdown("---")
         
