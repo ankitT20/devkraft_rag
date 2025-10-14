@@ -45,6 +45,11 @@ let audioQueueTime = 0;
 let audioProcessor = null;
 let responseQueue = [];
 
+// Speech Recognition state
+let recognition = null;
+let recognitionActive = false;
+let currentUserMessage = '';
+
 // UI Elements
 const connectBtn = document.getElementById('connect-btn');
 const statusDot = document.getElementById('status-dot');
@@ -72,12 +77,32 @@ function updateStatus(status, message) {
 /**
  * Add message to transcript
  */
-function addTranscriptMessage(type, content) {
+function addTranscriptMessage(type, content, isPartial = false) {
+    // Check if we should update existing partial message
+    if (isPartial && type === 'user') {
+        const existingPartial = transcript.querySelector('.message.user-message.partial');
+        if (existingPartial) {
+            existingPartial.textContent = content;
+            transcript.scrollTop = transcript.scrollHeight;
+            return;
+        }
+    }
+    
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}-message`;
+    messageDiv.className = `message ${type}-message${isPartial ? ' partial' : ''}`;
     messageDiv.textContent = content;
     transcript.appendChild(messageDiv);
     transcript.scrollTop = transcript.scrollHeight;
+}
+
+/**
+ * Finalize partial message (remove partial class)
+ */
+function finalizePartialMessage() {
+    const partialMessage = transcript.querySelector('.message.partial');
+    if (partialMessage) {
+        partialMessage.classList.remove('partial');
+    }
 }
 
 /**
@@ -166,7 +191,7 @@ async function connectToLiveAPI(functionDeclarations) {
             },
             systemInstruction: {
                 parts: [{
-                    text: "You are a helpful AI assistant with access to an external knowledge base. When users ask questions, Always search the knowledge base using the search_knowledge_base function to find relevant information. Provide accurate, helpful answers based on the retrieved information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
+                    text: "You are a helpful AI assistant with access to an external knowledge base. IMPORTANT: For EVERY user question or request, you MUST call the search_knowledge_base function to search the knowledge base before responding. Always search first, then provide your answer based on the retrieved information. Even for simple questions, search the knowledge base to ensure accurate, up-to-date information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
                 }]
             },
             tools: tools
@@ -273,6 +298,13 @@ async function handleSDKMessage(message) {
                         console.log('[AUDIO] ✓ Received audio chunk');
                         console.log('[AUDIO] mimeType:', part.inlineData.mimeType);
                         console.log('[AUDIO] data length (base64):', part.inlineData.data.length);
+                        
+                        // Add indicator that model is responding with audio (only once per turn)
+                        if (!window.audioResponseIndicatorShown) {
+                            addTranscriptMessage('assistant', 'Assistant: [Speaking...]');
+                            window.audioResponseIndicatorShown = true;
+                        }
+                        
                         playAudioChunk(part.inlineData.data);
                     } else if (part.inlineData) {
                         console.log('[MSG] InlineData without audio, mimeType:', part.inlineData.mimeType);
@@ -285,6 +317,8 @@ async function handleSDKMessage(message) {
             // Handle turn complete
             if (content.turnComplete) {
                 console.log('[MSG] ✓ Turn complete');
+                // Reset audio indicator for next turn
+                window.audioResponseIndicatorShown = false;
             }
             
             // Handle interruption
@@ -375,6 +409,121 @@ async function handleFunctionCall(functionCall) {
 }
 
 /**
+ * Initialize Web Speech API for speech-to-text
+ */
+function initializeSpeechRecognition() {
+    // Check if Web Speech API is available
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.warn('[STT] Web Speech API not available in this browser');
+        addTranscriptMessage('system', '⚠️ Speech-to-text not available in this browser (user speech won\'t be shown as text)');
+        return null;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US'; // Can be made configurable
+    
+    recognition.onstart = () => {
+        console.log('[STT] Speech recognition started');
+        recognitionActive = true;
+    };
+    
+    recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' ';
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+        
+        // Show interim results (updating the same partial message)
+        if (interimTranscript) {
+            currentUserMessage = interimTranscript;
+            addTranscriptMessage('user', `You: ${interimTranscript}`, true);
+        }
+        
+        // Finalize when we get final results - replace the partial message
+        if (finalTranscript) {
+            const trimmedFinal = finalTranscript.trim();
+            // Remove the partial message if it exists
+            const partialMessage = transcript.querySelector('.message.user-message.partial');
+            if (partialMessage) {
+                partialMessage.remove();
+            }
+            // Add the final message only
+            if (trimmedFinal) {
+                addTranscriptMessage('user', `You: ${trimmedFinal}`, false);
+            }
+            currentUserMessage = '';
+        }
+    };
+    
+    recognition.onerror = (event) => {
+        console.error('[STT] Speech recognition error:', event.error);
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            addTranscriptMessage('error', `Speech recognition error: ${event.error}`);
+        }
+    };
+    
+    recognition.onend = () => {
+        console.log('[STT] Speech recognition ended');
+        recognitionActive = false;
+        
+        // Restart if we're still recording
+        if (isRecording && recognition) {
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error('[STT] Failed to restart recognition:', e);
+            }
+        }
+    };
+    
+    return recognition;
+}
+
+/**
+ * Start speech recognition
+ */
+function startSpeechRecognition() {
+    if (!recognition) {
+        recognition = initializeSpeechRecognition();
+    }
+    
+    if (recognition && !recognitionActive) {
+        try {
+            recognition.start();
+            console.log('[STT] Started speech recognition');
+        } catch (e) {
+            console.error('[STT] Failed to start speech recognition:', e);
+        }
+    }
+}
+
+/**
+ * Stop speech recognition
+ */
+function stopSpeechRecognition() {
+    if (recognition && recognitionActive) {
+        try {
+            recognition.stop();
+            recognitionActive = false;
+            console.log('[STT] Stopped speech recognition');
+        } catch (e) {
+            console.error('[STT] Failed to stop speech recognition:', e);
+        }
+    }
+}
+
+/**
  * Start audio recording
  */
 async function startRecording() {
@@ -383,6 +532,9 @@ async function startRecording() {
         console.log('[INPUT] Live session available:', !!liveSession);
         console.log('[INPUT] sendRealtimeInput method:', !!liveSession?.sendRealtimeInput);
         console.log('[INPUT] sendToolResponse method:', !!liveSession?.sendToolResponse);
+        
+        // Start speech recognition for transcript
+        startSpeechRecognition();
         
         // Request microphone access
         audioStream = await navigator.mediaDevices.getUserMedia({ 
@@ -490,6 +642,9 @@ async function startRecording() {
  */
 function stopRecording() {
     isRecording = false;
+    
+    // Stop speech recognition
+    stopSpeechRecognition();
     
     if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
