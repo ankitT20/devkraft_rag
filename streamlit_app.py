@@ -253,7 +253,7 @@ def main():
         st.subheader("📄 Upload Document")
         uploaded_file = st.file_uploader(
             "Choose a file",
-            type=["txt", "pdf", "docx", "md"],
+            type=["txt", "pdf", "docx", "md", "csv"],
             help="Upload documents to add to the knowledge base"
         )
         
