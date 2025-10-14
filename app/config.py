@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     local_embedding_dim: int = 768
     
     # Chunking configuration
-    chunk_size: int = 2000  # characters
-    chunk_overlap: int = 400  # characters
+    chunk_size: int = 1500  # characters
+    chunk_overlap: int = 300  # characters
     
     # Paths
     generate_embeddings_folder: str = "generate_embeddings"
