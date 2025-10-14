@@ -184,7 +184,7 @@ class IngestionService:
         # Get all files (not in subdirectories)
         files = [
             f for f in folder.iterdir() 
-            if f.is_file() and f.suffix.lower() in ['.txt', '.pdf', '.docx', '.doc', '.md']
+            if f.is_file() and f.suffix.lower() in ['.txt', '.pdf', '.docx', '.doc', '.md', '.csv']
         ]
         
         app_logger.info(f"Found {len(files)} documents to ingest")
@@ -194,3 +194,73 @@ class IngestionService:
             results.append((file_path.name, success, message))
         
         return results
+    
+    def ingest_website(self, url: str) -> Tuple[bool, str]:
+        """
+        Ingest content from a website into vector databases.
+        
+        Args:
+            url: Website URL to ingest
+            
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            app_logger.info(f"Starting ingestion for website: {url}")
+            
+            # Load and chunk website content
+            chunks, chunk_page_metadata = self.processor.load_website(url)
+            base_metadata = {"filename": url}
+            
+            # Prepare metadata for each chunk
+            chunk_metadata = []
+            for i, page_meta in enumerate(chunk_page_metadata):
+                chunk_meta = {
+                    **base_metadata,
+                    "page": page_meta.get("page", 1),
+                    "header": page_meta.get("header", f"Web: {url}"),
+                    "chunkno": i + 1,
+                    "source": page_meta.get("source", url)
+                }
+                chunk_metadata.append(chunk_meta)
+            
+            # Generate embeddings and store
+            cloud_success = False
+            docker_success = False
+            
+            # Try cloud storage with Gemini embeddings
+            try:
+                gemini_vectors = self.gemini_embedding.embed_documents(chunks)
+                self.storage.add_to_cloud(gemini_vectors, chunk_metadata)
+                cloud_success = True
+                app_logger.info(f"Successfully stored website in cloud: {url}")
+            except Exception as e:
+                error_logger.error(f"Failed to store website in cloud: {e}")
+            
+            # Try docker storage with local embeddings
+            try:
+                local_vectors = self.local_embedding.embed_documents(chunks)
+                self.storage.add_to_docker(local_vectors, chunk_metadata)
+                docker_success = True
+                app_logger.info(f"Successfully stored website in docker: {url}")
+            except Exception as e:
+                error_logger.error(f"Failed to store website in docker: {e}")
+            
+            # Determine success message
+            if cloud_success and docker_success:
+                message = "Successfully ingested website into both cloud and docker"
+            elif cloud_success:
+                message = "Successfully ingested website into cloud only"
+            elif docker_success:
+                message = "Successfully ingested website into docker only"
+            else:
+                message = "Failed to ingest website into any storage"
+            
+            success = cloud_success or docker_success
+            app_logger.info(f"Website ingestion completed: {url} - {message}")
+            
+            return success, message
+            
+        except Exception as e:
+            error_logger.error(f"Failed to ingest website {url}: {e}")
+            return False, f"Error: {str(e)}"

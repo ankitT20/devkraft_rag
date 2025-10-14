@@ -2,16 +2,21 @@
 Document processing service for loading and chunking documents.
 """
 import os
+import re
 import hashlib
 from pathlib import Path
 from typing import List, Dict, Tuple
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import SemanticChunker
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
     Docx2txtLoader,
-    UnstructuredMarkdownLoader
+    UnstructuredMarkdownLoader,
+    CSVLoader,
+    WebBaseLoader
 )
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.config import settings
 from app.utils.logging_config import app_logger, error_logger
@@ -22,18 +27,69 @@ class DocumentProcessor:
     Service for loading and chunking documents using LangChain.
     """
     
-    def __init__(self):
-        """Initialize document processor with text splitter."""
+    def __init__(self, use_semantic_chunking: bool = True):
+        """Initialize document processor with text splitter.
+        
+        Args:
+            use_semantic_chunking: Whether to use semantic chunking (default: True)
+        """
+        self.use_semantic_chunking = use_semantic_chunking
+        
+        # Initialize RecursiveCharacterTextSplitter as fallback
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
             length_function=len,
             separators=["\n\n", "\n", " ", ""]
         )
+        
+        # Initialize SemanticChunker if enabled and API key is available
+        self.semantic_splitter = None
+        if use_semantic_chunking and settings.gemini_api_key:
+            try:
+                embeddings = GoogleGenerativeAIEmbeddings(
+                    model=settings.gemini_embedding_model,
+                    google_api_key=settings.gemini_api_key,
+                    task_type="retrieval_document"
+                )
+                self.semantic_splitter = SemanticChunker(
+                    embeddings=embeddings,
+                    breakpoint_threshold_type="percentile"
+                )
+                app_logger.info("Initialized DocumentProcessor with semantic chunking")
+            except Exception as e:
+                error_logger.warning(f"Failed to initialize semantic chunker, falling back to recursive: {e}")
+                self.semantic_splitter = None
+        
         app_logger.info(
             f"Initialized DocumentProcessor with chunk_size={settings.chunk_size}, "
-            f"chunk_overlap={settings.chunk_overlap}"
+            f"chunk_overlap={settings.chunk_overlap}, semantic_chunking={self.semantic_splitter is not None}"
         )
+    
+    def _preprocess_text(self, text: str) -> str:
+        """
+        Clean and standardize text by removing noise and formatting.
+        
+        Args:
+            text: Raw text to preprocess
+            
+        Returns:
+            Cleaned text
+        """
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove common headers/footers patterns (page numbers, etc.)
+        text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
+        text = re.sub(r'Page\s+\d+\s+of\s+\d+', '', text, flags=re.IGNORECASE)
+        
+        # Remove multiple consecutive newlines
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        
+        # Strip leading/trailing whitespace
+        text = text.strip()
+        
+        return text
     
     def load_document(self, file_path: str) -> Tuple[List[str], List[Dict]]:
         """
@@ -58,6 +114,8 @@ class DocumentProcessor:
                 loader = Docx2txtLoader(file_path)
             elif file_ext == ".md":
                 loader = UnstructuredMarkdownLoader(file_path)
+            elif file_ext == ".csv":
+                loader = CSVLoader(file_path, encoding="utf-8")
             else:
                 # Try text loader as fallback
                 app_logger.warning(f"Unknown file type {file_ext}, trying text loader")
@@ -66,13 +124,29 @@ class DocumentProcessor:
             # Load documents
             documents = loader.load()
             
+            # Preprocess documents
+            for doc in documents:
+                doc.page_content = self._preprocess_text(doc.page_content)
+            
             # For PDFs, preserve page information
             if file_ext == ".pdf":
                 chunks, chunk_metadata = self._process_pdf_with_metadata(documents, file_path)
             else:
-                # For non-PDF documents, use simple chunking
+                # For non-PDF documents, use semantic or recursive chunking
                 full_text = "\n\n".join([doc.page_content for doc in documents])
-                chunks = self.text_splitter.split_text(full_text)
+                
+                # Use semantic chunking if available
+                if self.semantic_splitter:
+                    try:
+                        semantic_docs = self.semantic_splitter.create_documents([full_text])
+                        chunks = [doc.page_content for doc in semantic_docs]
+                        app_logger.info(f"Used semantic chunking for {file_path}")
+                    except Exception as e:
+                        error_logger.warning(f"Semantic chunking failed, falling back to recursive: {e}")
+                        chunks = self.text_splitter.split_text(full_text)
+                else:
+                    chunks = self.text_splitter.split_text(full_text)
+                
                 chunk_metadata = []
                 for i in range(len(chunks)):
                     chunk_metadata.append({
@@ -88,6 +162,61 @@ class DocumentProcessor:
             
         except Exception as e:
             error_logger.error(f"Failed to load document {file_path}: {e}")
+            raise
+    
+    def load_website(self, url: str) -> Tuple[List[str], List[Dict]]:
+        """
+        Load and chunk content from a website URL.
+        
+        Args:
+            url: Website URL to load
+            
+        Returns:
+            Tuple of (List of text chunks, List of chunk metadata)
+        """
+        try:
+            app_logger.info(f"Loading website: {url}")
+            
+            # Load website content
+            loader = WebBaseLoader(url)
+            documents = loader.load()
+            
+            # Preprocess documents
+            for doc in documents:
+                doc.page_content = self._preprocess_text(doc.page_content)
+            
+            # Combine all documents
+            full_text = "\n\n".join([doc.page_content for doc in documents])
+            
+            # Use semantic chunking if available
+            if self.semantic_splitter:
+                try:
+                    semantic_docs = self.semantic_splitter.create_documents([full_text])
+                    chunks = [doc.page_content for doc in semantic_docs]
+                    app_logger.info(f"Used semantic chunking for website {url}")
+                except Exception as e:
+                    error_logger.warning(f"Semantic chunking failed, falling back to recursive: {e}")
+                    chunks = self.text_splitter.split_text(full_text)
+            else:
+                chunks = self.text_splitter.split_text(full_text)
+            
+            # Create metadata for each chunk
+            chunk_metadata = []
+            for i in range(len(chunks)):
+                chunk_metadata.append({
+                    "page": 1,
+                    "header": f"Web: {url}",
+                    "source": url
+                })
+            
+            app_logger.info(
+                f"Successfully loaded and chunked website: {url} "
+                f"into {len(chunks)} chunks"
+            )
+            return chunks, chunk_metadata
+            
+        except Exception as e:
+            error_logger.error(f"Failed to load website {url}: {e}")
             raise
     
     def _process_pdf_with_metadata(self, documents: List, file_path: str) -> Tuple[List[str], List[Dict]]:
@@ -116,8 +245,16 @@ class DocumentProcessor:
             if not header:
                 header = f"Page {page_num}"
             
-            # Split page content into chunks
-            page_chunks = self.text_splitter.split_text(page_content)
+            # Split page content into chunks using semantic or recursive splitter
+            if self.semantic_splitter:
+                try:
+                    semantic_docs = self.semantic_splitter.create_documents([page_content])
+                    page_chunks = [doc.page_content for doc in semantic_docs]
+                except Exception as e:
+                    error_logger.warning(f"Semantic chunking failed for page {page_num}, using recursive: {e}")
+                    page_chunks = self.text_splitter.split_text(page_content)
+            else:
+                page_chunks = self.text_splitter.split_text(page_content)
             
             # Associate each chunk with the page number and header
             for chunk in page_chunks:
