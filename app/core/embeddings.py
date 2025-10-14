@@ -30,7 +30,9 @@ class GeminiEmbedding:
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for documents using RETRIEVAL_DOCUMENT task type.
-        Implements rate limiting: 10 second delay after every 50 API calls.
+        Implements batching (max 90 per batch) and rate limiting to comply with API limits.
+        - Batch limit: 90 requests per batch (API max is 100, using 90 for safety)
+        - Rate limit: 90 requests per minute (API max is 100, using 90 for safety)
         
         Args:
             texts: List of text strings to embed
@@ -41,22 +43,45 @@ class GeminiEmbedding:
         try:
             app_logger.info(f"Generating Gemini embeddings for {len(texts)} chunks")
             
-            # Check if we need to apply rate limiting
-            self.api_call_count += 1
-            if self.api_call_count % 50 == 0:
-                app_logger.info(f"Rate limiting: Applied 10 second delay after {self.api_call_count} API calls")
-                time.sleep(10)
+            # Check for empty input
+            if not texts or len(texts) == 0:
+                error_logger.error("Cannot generate embeddings: texts list is empty")
+                raise ValueError("texts list cannot be empty")
             
-            result = self.client.models.embed_content(
-                model=self.model,
-                contents=texts,
-                config=types.EmbedContentConfig(
-                    task_type="RETRIEVAL_DOCUMENT"
+            # Batch processing: max 90 requests per batch
+            BATCH_SIZE = 90
+            all_embeddings = []
+            
+            for i in range(0, len(texts), BATCH_SIZE):
+                batch = texts[i:i + BATCH_SIZE]
+                batch_num = (i // BATCH_SIZE) + 1
+                total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
+                
+                app_logger.info(f"Processing batch {batch_num}/{total_batches} with {len(batch)} texts")
+                
+                # Apply rate limiting: 90 requests per minute
+                # After processing a batch, wait if needed to stay under rate limit
+                self.api_call_count += len(batch)
+                
+                result = self.client.models.embed_content(
+                    model=self.model,
+                    contents=batch,
+                    config=types.EmbedContentConfig(
+                        task_type="RETRIEVAL_DOCUMENT"
+                    )
                 )
-            )
-            embeddings = [emb.values for emb in result.embeddings]
-            app_logger.info(f"Successfully generated {len(embeddings)} Gemini embeddings")
-            return embeddings
+                batch_embeddings = [emb.values for emb in result.embeddings]
+                all_embeddings.extend(batch_embeddings)
+                
+                # Rate limiting: wait ~0.7 seconds per request to stay under 90/min
+                # For a batch of 90, wait ~63 seconds before next batch
+                if i + BATCH_SIZE < len(texts):  # Not the last batch
+                    wait_time = len(batch) * 0.7  # ~0.7 sec per request = ~90 req/min
+                    app_logger.info(f"Rate limiting: waiting {wait_time:.1f} seconds before next batch")
+                    time.sleep(wait_time)
+            
+            app_logger.info(f"Successfully generated {len(all_embeddings)} Gemini embeddings")
+            return all_embeddings
         except Exception as e:
             error_logger.error(f"Failed to generate Gemini embeddings: {e}")
             raise

@@ -63,25 +63,38 @@ class IngestionService:
             docker_exists = self.storage.check_document_exists(md5_hash, settings.qdrant_docker_collection)
             
             if cloud_exists or docker_exists:
-                msg = "document may already exist"
-                app_logger.info(f"Document with MD5 {md5_hash} already exists - skipping processing")
-                # Move file to appropriate folder without processing
+                # Provide specific message about where the document exists
                 if cloud_exists and docker_exists:
+                    msg = "duplicate: document already exists in both cloud and docker storage"
                     self._move_file(file_path, settings.stored_folder)
                 elif cloud_exists:
+                    msg = "duplicate: document already exists in cloud storage"
                     self._move_file(file_path, settings.stored_cloud_only_folder)
                 elif docker_exists:
+                    msg = "duplicate: document already exists in docker storage"
                     self._move_file(file_path, settings.stored_docker_only_folder)
+                
+                app_logger.info(f"Document with MD5 {md5_hash} already exists - skipping processing")
                 return False, msg
             
             # Load and chunk document with metadata
-            chunks, chunk_page_metadata = self.processor.load_document(file_path)
+            try:
+                chunks, chunk_page_metadata = self.processor.load_document(file_path)
+            except ValueError as ve:
+                # Specific error from document processor about empty content
+                msg = f"empty content: {str(ve)}"
+                error_logger.error(f"Document {file_path} has no content: {ve}")
+                return False, msg
+            except Exception as e:
+                # Other loading errors
+                msg = f"loading error: {str(e)}"
+                error_logger.error(f"Failed to load document {file_path}: {e}")
+                return False, msg
             
             # Validate that we have chunks to process
             if not chunks or len(chunks) == 0:
-                msg = "document contains no processable content"
+                msg = "empty content: document resulted in 0 chunks after processing"
                 error_logger.error(f"Document {file_path} resulted in 0 chunks after processing")
-                # Move file to a failure folder or keep in place
                 return False, msg
             
             base_metadata = self.processor.get_document_metadata(file_path)
@@ -102,6 +115,7 @@ class IngestionService:
             docker_success = False
             
             # Try Gemini + Cloud
+            cloud_error = None
             try:
                 app_logger.info("Generating Gemini embeddings for cloud storage")
                 gemini_embeddings = self.gemini_embedding.embed_documents(chunks)
@@ -112,9 +126,11 @@ class IngestionService:
                     md5_hash=md5_hash
                 )
             except Exception as e:
+                cloud_error = str(e)
                 error_logger.error(f"Failed to store in cloud: {e}")
             
             # Try Local + Docker
+            docker_error = None
             try:
                 app_logger.info("Generating local embeddings for docker storage")
                 local_embeddings = self.local_embedding.embed_documents(chunks)
@@ -125,6 +141,7 @@ class IngestionService:
                     md5_hash=md5_hash
                 )
             except Exception as e:
+                docker_error = str(e)
                 error_logger.error(f"Failed to store in docker: {e}")
             
             # Move file to appropriate folder
@@ -133,13 +150,33 @@ class IngestionService:
             
             # Generate result message
             if cloud_success and docker_success:
-                msg = f"Successfully ingested to both cloud and docker"
+                msg = "success: ingested to both cloud and docker"
             elif cloud_success:
-                msg = f"Successfully ingested to cloud only"
+                msg = "partial success: ingested to cloud only"
+                if docker_error:
+                    msg += f" (docker failed: {docker_error[:100]})"
             elif docker_success:
-                msg = f"Successfully ingested to docker only"
+                msg = "partial success: ingested to docker only"
+                if cloud_error:
+                    msg += f" (cloud failed: {cloud_error[:100]})"
             else:
-                msg = "document may already exist"
+                # Both failed - provide detailed error message
+                errors = []
+                if cloud_error:
+                    # Check for specific error types
+                    if "INVALID_ARGUMENT" in cloud_error and "empty" in cloud_error.lower():
+                        errors.append("cloud embedding error: batch request was empty")
+                    elif "INVALID_ARGUMENT" in cloud_error and "100" in cloud_error:
+                        errors.append("cloud embedding error: exceeded batch size limit")
+                    else:
+                        errors.append(f"cloud error: {cloud_error[:100]}")
+                if docker_error:
+                    if "402" in docker_error or "Payment Required" in docker_error:
+                        errors.append("docker error: HuggingFace quota exceeded")
+                    else:
+                        errors.append(f"docker error: {docker_error[:100]}")
+                
+                msg = "failed: " + "; ".join(errors) if errors else "failed: unknown error"
                 error_logger.error(msg)
                 return False, msg
             
