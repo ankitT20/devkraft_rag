@@ -54,8 +54,15 @@ generate_embeddings/stored/*
 generate_embeddings/stored_in_q_docker_only/*
 generate_embeddings/stored_in_q_cloud_only/*
 
+# JavaScript/Node
+node_modules/
+static/node_modules/
+package-lock.json
+static/package-lock.json
+
 # Temporary files
 /tmp/
 *.tmp
 *.wav
 *.mp3
+*.png
