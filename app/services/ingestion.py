@@ -76,6 +76,14 @@ class IngestionService:
             
             # Load and chunk document with metadata
             chunks, chunk_page_metadata = self.processor.load_document(file_path)
+            
+            # Validate that we have chunks to process
+            if not chunks or len(chunks) == 0:
+                msg = "document contains no processable content"
+                error_logger.error(f"Document {file_path} resulted in 0 chunks after processing")
+                # Move file to a failure folder or keep in place
+                return False, msg
+            
             base_metadata = self.processor.get_document_metadata(file_path)
             
             # Prepare metadata for each chunk with page, header, and chunkno
