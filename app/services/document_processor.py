@@ -7,7 +7,7 @@ import hashlib
 from pathlib import Path
 from typing import List, Dict, Tuple
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_text_splitters import SemanticChunker
+from langchain_experimental.text_splitter import SemanticChunker
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
