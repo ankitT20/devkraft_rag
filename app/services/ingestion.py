@@ -58,6 +58,22 @@ class IngestionService:
             md5_hash = self.processor.calculate_md5(file_path)
             app_logger.info(f"Document MD5: {md5_hash}")
             
+            # Check if document already exists BEFORE processing to save API quota
+            cloud_exists = self.storage.check_document_exists(md5_hash, settings.qdrant_cloud_collection)
+            docker_exists = self.storage.check_document_exists(md5_hash, settings.qdrant_docker_collection)
+            
+            if cloud_exists or docker_exists:
+                msg = "document may already exist"
+                app_logger.info(f"Document with MD5 {md5_hash} already exists - skipping processing")
+                # Move file to appropriate folder without processing
+                if cloud_exists and docker_exists:
+                    self._move_file(file_path, settings.stored_folder)
+                elif cloud_exists:
+                    self._move_file(file_path, settings.stored_cloud_only_folder)
+                elif docker_exists:
+                    self._move_file(file_path, settings.stored_docker_only_folder)
+                return False, msg
+            
             # Load and chunk document with metadata
             chunks, chunk_page_metadata = self.processor.load_document(file_path)
             base_metadata = self.processor.get_document_metadata(file_path)
@@ -115,7 +131,7 @@ class IngestionService:
             elif docker_success:
                 msg = f"Successfully ingested to docker only"
             else:
-                msg = f"Failed to ingest to any database (document may already exist)"
+                msg = "document may already exist"
                 error_logger.error(msg)
                 return False, msg
             
