@@ -8,6 +8,7 @@ python-multipart==0.0.20
 google-genai>=1.41.0
 langchain>=0.3.0
 langchain-community>=0.3.0
+langchain-experimental>=0.3.0
 langchain-google-genai>=2.0.0
 langchain-qdrant>=0.2.0
 qdrant-client>=1.12.0
@@ -17,6 +18,8 @@ huggingface-hub>=0.27.0
 pypdf==5.1.0
 python-docx==1.1.2
 python-magic==0.4.27
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
 
 # Data handling
 pydantic==2.10.3
@@ -30,3 +33,13 @@ requests==2.32.3
 aiofiles==24.1.0
 uuid7==0.1.0
 pymongo[srv]>=4.10.0
+
+# Linting and code quality
+flake8>=7.0.0
+black>=24.0.0
+isort>=5.13.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+playwright>=1.40.0
