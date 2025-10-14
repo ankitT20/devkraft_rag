@@ -1,0 +1,33 @@
+name: Keep Services Alive
+
+# This workflow keeps your deployed services awake by pinging them every 14 minutes
+# Useful for Render free tier which sleeps after 15 minutes of inactivity
+
+on:
+  schedule:
+    # Run every 14 minutes (Render sleeps after 15 min)
+    - cron: '*/14 * * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping API Health Endpoint
+        run: |
+          echo "Pinging API health endpoint..."
+          curl -f https://devkraft-rag-api.onrender.com/health || echo "API ping failed (might not be deployed yet)"
+        continue-on-error: true
+      
+      - name: Ping UI
+        run: |
+          echo "Pinging Streamlit UI..."
+          curl -f https://devkraft-rag-ui.onrender.com || echo "UI ping failed (might not be deployed yet)"
+        continue-on-error: true
+      
+      - name: Log Success
+        run: |
+          echo "Keep-alive ping completed at $(date)"

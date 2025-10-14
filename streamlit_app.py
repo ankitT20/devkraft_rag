@@ -5,6 +5,7 @@ Simple chatbot interface with document upload and model selection.
 import streamlit as st
 import requests
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -26,8 +27,9 @@ st.set_page_config(
 
 logger.info("Streamlit UI initialized")
 
-# API endpoint
-API_URL = "http://localhost:8000"
+# API endpoint - use environment variable for cloud deployments, fallback to localhost
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+logger.info(f"Using API URL: {API_URL}")
 
 # Model configurations for display
 MODEL_INFO = {

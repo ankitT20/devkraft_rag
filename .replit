@@ -1,0 +1,30 @@
+# Replit configuration for DevKraft RAG
+# This file tells Replit how to run your application
+
+# The command to run when you click "Run"
+run = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+# Language detection
+language = "python3"
+
+# Entry point
+entrypoint = "app/main.py"
+
+# Hidden files (not shown in file tree)
+hidden = [".pythonlibs", ".config", ".cache"]
+
+# Modules configuration
+[nix]
+channel = "stable-23_05"
+
+[deployment]
+run = ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+# Environment setup
+[env]
+PYTHONPATH = "/home/runner/$REPL_SLUG"
+
+# Ports configuration
+[[ports]]
+localPort = 8000
+externalPort = 80

@@ -259,4 +259,40 @@ After processing, files are moved to:
 - `generate_embeddings/stored_in_q_cloud_only/` - Cloud only
 - `generate_embeddings/stored_in_q_docker_only/` - Docker only
 
+## Deployment
+
+The application can be deployed to various FREE platforms. See the comprehensive deployment guides:
+
+### 📚 Deployment Documentation
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete guide comparing all FREE deployment platforms
+- **[deployment_guides/QUICK_START.md](./deployment_guides/QUICK_START.md)** - Quick deployment commands
+- **[deployment_guides/RENDER.md](./deployment_guides/RENDER.md)** - Detailed Render guide (⭐ Recommended)
+- **[deployment_guides/RAILWAY.md](./deployment_guides/RAILWAY.md)** - Detailed Railway guide
+
+### 🚀 Quick Deploy
+
+**Render (Recommended):**
+```bash
+# 1. Push to GitHub
+# 2. Visit https://render.com/ and create a Blueprint
+# 3. Select your repo (render.yaml is already configured)
+# 4. Add environment variables
+# Done! Your app is live in ~10 minutes
+```
+
+**Railway:**
+```bash
+# Install CLI
+curl -fsSL https://railway.app/install.sh | sh
+
+# Deploy
+railway login
+railway init
+railway up
+```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on all platforms.
+
+---
+
 ### Make By Ankit Tayal

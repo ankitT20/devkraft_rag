@@ -389,4 +389,10 @@ async def voice_interface():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    
+    # Use PORT environment variable if available (for cloud platforms like Render, Railway, etc.)
+    # Otherwise default to 8000 for local development
+    port = int(os.getenv("PORT", 8000))
+    
+    uvicorn.run(app, host="0.0.0.0", port=port)
