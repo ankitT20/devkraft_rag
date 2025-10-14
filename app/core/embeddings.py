@@ -39,7 +39,7 @@ class GeminiEmbedding:
             List of embedding vectors (3072 dimensions each)
         """
         try:
-            app_logger.info(f"Generating Gemini embeddings for {len(texts)} documents")
+            app_logger.info(f"Generating Gemini embeddings for {len(texts)} chunks")
             
             # Check if we need to apply rate limiting
             self.api_call_count += 1
@@ -185,7 +185,7 @@ class LocalEmbedding:
             List of normalized embedding vectors (768 dimensions each)
         """
         try:
-            app_logger.info(f"Generating local embeddings for {len(texts)} documents")
+            app_logger.info(f"Generating local embeddings for {len(texts)} chunks")
             embeddings = []
             
             for text in texts:
