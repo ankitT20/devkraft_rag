@@ -195,12 +195,25 @@ header p {
     background: #e3f2fd;
     color: #1976d2;
     margin-left: 20px;
+    border-left: 4px solid #1976d2;
+}
+
+.user-message.partial {
+    opacity: 0.7;
+    font-style: italic;
+    border-left: 4px dashed #1976d2;
 }
 
 .assistant-message {
     background: #f1f8e9;
     color: #558b2f;
     margin-right: 20px;
+    border-left: 4px solid #558b2f;
+}
+
+.assistant-message::before {
+    content: "🔊 ";
+    margin-right: 5px;
 }
 
 .system-message {
