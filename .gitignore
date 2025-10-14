@@ -50,6 +50,7 @@ generate_embeddings/*.pdf
 generate_embeddings/*.docx
 generate_embeddings/*.txt
 generate_embeddings/*.md
+generate_embeddings/*.csv
 generate_embeddings/stored/*
 generate_embeddings/stored_in_q_docker_only/*
 generate_embeddings/stored_in_q_cloud_only/*

@@ -5,11 +5,16 @@ A simple Retrieval-Augmented Generation (RAG) system with a Streamlit UI, FastAP
 ## Features
 
 - 🤖 **Dual Model Support**: Choose between Gemini Cloud (gemini-2.5-flash) or Local LMStudio/HF (qwen3-1.7b)
-- 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD)
+- 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD, CSV, URLs)
+- 🌐 **Website Ingestion**: Extract and ingest content directly from websites
+- 🧹 **Text Preprocessing**: Automatic cleaning and standardization of documents
+- ✂️ **Smart Chunking**: Support for both recursive and semantic chunking strategies
 - 💾 **Vector Storage**: Dual storage with Qdrant Cloud and Docker
 - 💬 **Chat History**: Persistent chat sessions stored in MongoDB Atlas (with JSON file fallback)
 - 🧠 **Thinking Display**: View model reasoning process (qwen3)
 - 🔍 **RAG Pipeline**: Semantic search and context-aware responses
+- 🧪 **Testing**: Comprehensive test suite with pytest
+- 📏 **Code Quality**: Linted with flake8, formatted with black
 
 ## Project Structure
 
@@ -243,10 +248,12 @@ Logs are appended when the application is restarted multiple times on the same d
 
 ## Document Processing
 
-- **Chunking**: Semantic chunking with LangChain
-- **Chunk Size**: 2000 characters
-- **Overlap**: 400 characters
-- **Supported Formats**: TXT, PDF, DOCX, MD
+- **Chunking**: Recursive and Semantic chunking with LangChain
+- **Chunk Size**: 1500 characters (default)
+- **Overlap**: 300 characters (default)
+- **Supported Formats**: TXT, PDF, DOCX, MD, CSV, Websites (URLs)
+- **Preprocessing**: Automatic text cleaning (removes page numbers, headers, footers)
+- **LangChain Loaders**: TextLoader, PyPDFLoader, Docx2txtLoader, UnstructuredMarkdownLoader, CSVLoader, WebBaseLoader
 
 ## Storage Strategy
 
@@ -258,5 +265,32 @@ After processing, files are moved to:
 - `generate_embeddings/stored/` - Both storages succeeded
 - `generate_embeddings/stored_in_q_cloud_only/` - Cloud only
 - `generate_embeddings/stored_in_q_docker_only/` - Docker only
+
+## Recent Improvements
+
+See [IMPROVEMENTS.md](IMPROVEMENTS.md) for detailed documentation on recent enhancements including:
+- Linting and code quality tools (black, flake8, isort)
+- Text preprocessing and cleaning
+- CSV file support
+- Website URL ingestion
+- Semantic chunking option
+- Comprehensive test suite
+
+## Development
+
+### Code Quality
+```bash
+# Format code
+black app/ streamlit_app.py
+
+# Sort imports
+isort app/ streamlit_app.py
+
+# Lint code
+flake8 app/ streamlit_app.py
+
+# Run tests
+pytest tests/ -v
+```
 
 ### Make By Ankit Tayal
