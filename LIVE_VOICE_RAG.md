@@ -85,21 +85,24 @@ Navigate directly to `http://localhost:8000/voice`
 
 ### Using the Voice Interface
 
-1. **Connect**: Click the "🔌 Connect" button to establish connection
+1. **Connect**: Click the "🔌 Connect & Talk" button to establish connection
    - System generates an ephemeral token (no API key exposure)
    - Connection established via JavaScript SDK (@google/genai)
    - Model initialized with RAG function declarations
+   - Microphone automatically starts for both audio streaming and speech recognition
 
-2. **Start Talking**: Click the "🎤 Start Talking" button
-   - Microphone access requested
-   - Audio streaming begins (16-bit PCM, 16kHz)
+2. **Conversation**:
+   - Speak naturally to the assistant
+   - Your speech is transcribed in real-time (shown in blue in transcript)
+   - AI automatically searches knowledge base when needed (shown in yellow)
+   - Responses are played back in real-time as audio (shown in green with 🔊 icon)
    - Voice visualization displays audio waveform
 
-3. **Conversation**:
-   - Speak naturally to the assistant
-   - AI automatically searches knowledge base when needed
-   - Responses are played back in real-time (24kHz)
-   - Conversation transcript displayed on screen
+3. **Transcript Display**:
+   - **You (Blue)**: Your speech transcribed using Web Speech API
+   - **System (Yellow)**: Function calls and search results
+   - **Assistant (Green with 🔊)**: Model's audio responses (text not available due to API limitation)
+   - Note: Model responses shown as "[Speaking...]" because API only supports AUDIO or TEXT, not both
 
 4. **Disconnect**: Click the "⏹️ Disconnect" button to end session
 
@@ -146,9 +149,15 @@ wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.
 
 ## Limitations
 
-1. **Response Modality**: Only AUDIO mode (cannot return text in same session)
+1. **Response Modality**: Only AUDIO mode (cannot return text transcripts of model's speech)
+   - User speech IS transcribed using Web Speech API
+   - Model speech shown as "[Speaking...]" indicator only
+   - See `LIVE_API_TRANSCRIPT.md` for detailed explanation
 2. **Feature Compatibility**: Cannot use affective dialog or proactive audio with function calling
-3. **Browser Support**: Requires modern browser with Web Audio API support
+3. **Browser Support**: 
+   - Requires modern browser with Web Audio API support
+   - Speech recognition works in Chrome, Edge, and Safari (not Firefox)
+   - Requires HTTPS or localhost for speech recognition
 4. **Network**: Requires stable internet connection for streaming
 
 ## API Endpoints

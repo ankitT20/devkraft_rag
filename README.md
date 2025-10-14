@@ -5,11 +5,17 @@ A simple Retrieval-Augmented Generation (RAG) system with a Streamlit UI, FastAP
 ## Features
 
 - 🤖 **Dual Model Support**: Choose between Gemini Cloud (gemini-2.5-flash) or Local LMStudio/HF (qwen3-1.7b)
+- 🎤 **Live Voice RAG**: Real-time voice interaction with native audio (Gemini 2.5 Flash Native Audio)
+  - Real-time speech transcription for user speech (Web Speech API)
+  - Live audio responses from AI assistant
+  - Visual transcript showing conversation flow
+  - RAG function calling for knowledge base search
 - 📚 **Document Ingestion**: Upload and process multiple document types (TXT, PDF, DOCX, MD)
 - 💾 **Vector Storage**: Dual storage with Qdrant Cloud and Docker
 - 💬 **Chat History**: Persistent chat sessions stored in MongoDB Atlas (with JSON file fallback)
 - 🧠 **Thinking Display**: View model reasoning process (qwen3)
 - 🔍 **RAG Pipeline**: Semantic search and context-aware responses
+- 🔊 **Text-to-Speech**: Convert text responses to audio using Gemini TTS
 
 ## Project Structure
 
