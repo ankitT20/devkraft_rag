@@ -1,0 +1,166 @@
+DevKraft RAG - Deployment Files Structure
+==========================================
+
+Repository Root
+│
+├── 📄 DEPLOYMENT.md (21 KB)
+│   └── Comprehensive guide comparing all FREE platforms
+│
+├── 📁 deployment_guides/
+│   ├── 📄 README.md (2 KB)
+│   │   └── Index of all deployment guides
+│   ├── 📄 QUICK_START.md (5 KB)
+│   │   └── Fast deployment commands
+│   ├── 📄 RENDER.md (7 KB)
+│   │   └── Detailed Render guide (Recommended)
+│   ├── 📄 RAILWAY.md (8.5 KB)
+│   │   └── Detailed Railway guide
+│   └── 📄 SUMMARY.md (9 KB)
+│       └── Overview of all deployment docs
+│
+├── ⚙️ render.yaml (1 KB)
+│   └── Render Infrastructure as Code
+│       ├── FastAPI service config
+│       └── Streamlit service config
+│
+├── ⚙️ Procfile (104 bytes)
+│   └── Railway/Heroku deployment
+│
+├── ⚙️ railway.json (332 bytes)
+│   └── Railway-specific config
+│       ├── Health checks
+│       └── Restart policy
+│
+├── ⚙️ fly.toml (781 bytes)
+│   └── Fly.io API service config
+│
+├── ⚙️ fly-streamlit.toml (642 bytes)
+│   └── Fly.io UI service config
+│
+├── ⚙️ .replit (638 bytes)
+│   └── Replit configuration
+│
+├── 📁 .github/workflows/
+│   └── ⚙️ keep-alive.yml (979 bytes)
+│       └── GitHub Action to prevent sleep
+│           ├── Runs every 14 minutes
+│           ├── Pings API health endpoint
+│           └── Pings Streamlit UI
+│
+├── 💻 app/main.py (UPDATED)
+│   └── Added PORT environment variable support
+│       └── port = int(os.getenv("PORT", 8000))
+│
+└── 💻 streamlit_app.py (UPDATED)
+    └── Added API_URL environment variable support
+        └── API_URL = os.getenv("API_URL", "http://localhost:8000")
+
+
+Platform Support Matrix
+========================
+
+Platform         Config File       Status      Free Tier        Sleep Policy
+---------------------------------------------------------------------------
+Render          render.yaml        ✓ Ready     750 hrs/mo       15 min inactivity
+Railway         Procfile           ✓ Ready     $5 credit/mo     No sleep
+                railway.json
+Fly.io          fly.toml           ✓ Ready     3 VMs free       Auto-start
+                fly-streamlit.toml
+Replit          .replit            ✓ Ready     Limited          Aggressive
+HF Spaces       (manual setup)     ✓ Docs      Unlimited        48h inactivity
+PythonAnywhere  (manual setup)     ✓ Docs      1 web app        Always on
+Glitch          (manual setup)     ✓ Docs      Unlimited        5 min inactivity
+Cyclic          N/A                ✗ Shut down N/A              N/A
+
+
+Documentation Coverage
+======================
+
+Topic                           Location                    Status
+------------------------------------------------------------------------
+Platform Comparison            DEPLOYMENT.md                ✓ Complete
+Render Deployment              deployment_guides/RENDER.md  ✓ Complete
+Railway Deployment             deployment_guides/RAILWAY.md ✓ Complete
+Fly.io Deployment              DEPLOYMENT.md                ✓ Complete
+HF Spaces Deployment           DEPLOYMENT.md                ✓ Complete
+Quick Start Commands           deployment_guides/QUICK_START.md ✓ Complete
+Reddit Comment Explanation     DEPLOYMENT.md                ✓ Complete
+Environment Variables          All guides                   ✓ Complete
+Troubleshooting               All guides                   ✓ Complete
+Cost Optimization             All guides                   ✓ Complete
+Keep-Alive Setup              DEPLOYMENT.md                ✓ Complete
+
+
+Files Created
+=============
+
+Type                Count    Total Size
+-----------------------------------------
+Markdown Guides     6        ~42 KB
+Configuration       6        ~3.5 KB
+Code Updates        2        N/A
+GitHub Actions      1        ~1 KB
+-----------------------------------------
+Total              15        ~46.5 KB
+
+
+Key Features
+============
+
+✓ 8 platforms researched and documented
+✓ 3 detailed step-by-step guides (Render, Railway, Quick Start)
+✓ 6 ready-to-use configuration files
+✓ GitHub Action for automatic keep-alive
+✓ Code updates for cloud compatibility
+✓ Reddit comment explained in detail
+✓ Comprehensive troubleshooting sections
+✓ Cost comparison and optimization tips
+✓ Environment variable setup for all platforms
+✓ Fallback configuration documented
+
+
+Recommendations
+===============
+
+1. 🥇 Render (render.yaml)
+   - Best for beginners
+   - You're already familiar
+   - Easy setup with Blueprint
+   - Good documentation
+
+2. 🥈 Railway (Procfile, railway.json)
+   - No sleep policy
+   - Faster cold starts
+   - Better performance
+   - $5 credit/mo
+
+3. 🥉 Fly.io (fly.toml, fly-streamlit.toml)
+   - Production-grade
+   - Global deployment
+   - Advanced users
+   - CLI-focused
+
+
+Quick Start
+===========
+
+1. Choose Platform:
+   └─> Render (recommended for you)
+
+2. Read Guide:
+   └─> deployment_guides/RENDER.md
+
+3. Deploy:
+   └─> Push to GitHub
+   └─> Create Render Blueprint
+   └─> Add environment variables
+   └─> Done!
+
+4. Optional:
+   └─> Enable keep-alive.yml workflow
+   └─> Set up custom domain
+   └─> Configure monitoring
+
+
+Made by Ankit Tayal
+DevKraft RAG - A free, open-source RAG system
