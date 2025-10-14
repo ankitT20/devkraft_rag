@@ -14,35 +14,43 @@
         </header>
 
         <div class="main-content">
-            <!-- Connection Status -->
-            <div class="status-panel">
-                <div class="status-indicator" id="status-indicator">
-                    <span class="status-dot" id="status-dot"></span>
-                    <span id="status-text">Disconnected</span>
+            <!-- Split Layout: Left and Right Panels -->
+            <div class="split-container">
+                <!-- Left Panel: Status, Visualizer, Controls -->
+                <div class="left-panel">
+                    <!-- Connection Status -->
+                    <div class="status-panel">
+                        <div class="status-indicator" id="status-indicator">
+                            <span class="status-dot" id="status-dot"></span>
+                            <span id="status-text">Disconnected</span>
+                        </div>
+                    </div>
+
+                    <!-- Voice Visualization -->
+                    <div class="voice-visualizer">
+                        <canvas id="visualizer" width="400" height="200"></canvas>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="controls">
+                        <button id="connect-btn" class="btn btn-primary">
+                            <span id="connect-icon">🔌</span>
+                            <span id="connect-text">Connect & Talk</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Voice Visualization -->
-            <div class="voice-visualizer">
-                <canvas id="visualizer" width="800" height="200"></canvas>
-            </div>
-
-            <!-- Controls -->
-            <div class="controls">
-                <button id="connect-btn" class="btn btn-primary">
-                    <span id="connect-icon">🔌</span>
-                    <span id="connect-text">Connect & Talk</span>
-                </button>
-            </div>
-
-            <!-- Transcript Display -->
-            <div class="transcript-panel">
-                <h3>Conversation Transcript</h3>
-                <div style="background: #fff3e0; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 0.9em; color: #e65100;">
-                    <strong>ℹ️ Note:</strong> User speech is transcribed using Web Speech API. Model responses are shown as 🔊 (audio only) due to Gemini API limitation (can't get text + audio simultaneously).
-                </div>
-                <div id="transcript" class="transcript-content">
-                    <p class="system-message">Connect to start the conversation...</p>
+                <!-- Right Panel: Transcript Display -->
+                <div class="right-panel">
+                    <div class="transcript-panel">
+                        <h3>Conversation Transcript</h3>
+                        <div style="background: #fff3e0; padding: 8px; border-radius: 8px; margin-bottom: 10px; font-size: 0.85em; color: #e65100;">
+                            <strong>ℹ️ Note:</strong> User speech transcribed (Experimental). Model responses shown as 🔊 (audio only - API limitation).
+                        </div>
+                        <div id="transcript" class="transcript-content">
+                            <p class="system-message">Connect to start the conversation...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

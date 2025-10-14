@@ -191,7 +191,7 @@ async function connectToLiveAPI(functionDeclarations) {
             },
             systemInstruction: {
                 parts: [{
-                    text: "You are a helpful AI assistant with access to an external knowledge base. When users ask questions, Always search the knowledge base using the search_knowledge_base function to find relevant information. Provide accurate, helpful answers based on the retrieved information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
+                    text: "You are a helpful AI assistant with access to an external knowledge base. IMPORTANT: For EVERY user question or request, you MUST call the search_knowledge_base function to search the knowledge base before responding. Always search first, then provide your answer based on the retrieved information. Even for simple questions, search the knowledge base to ensure accurate, up-to-date information. You can understand and respond in multiple languages automatically. Be friendly and conversational."
                 }]
             },
             tools: tools
@@ -444,18 +444,23 @@ function initializeSpeechRecognition() {
             }
         }
         
-        // Show interim results
+        // Show interim results (updating the same partial message)
         if (interimTranscript) {
             currentUserMessage = interimTranscript;
             addTranscriptMessage('user', `You: ${interimTranscript}`, true);
         }
         
-        // Finalize when we get final results
+        // Finalize when we get final results - replace the partial message
         if (finalTranscript) {
-            currentUserMessage = finalTranscript.trim();
-            finalizePartialMessage();
-            if (currentUserMessage) {
-                addTranscriptMessage('user', `You: ${currentUserMessage}`, false);
+            const trimmedFinal = finalTranscript.trim();
+            // Remove the partial message if it exists
+            const partialMessage = transcript.querySelector('.message.user-message.partial');
+            if (partialMessage) {
+                partialMessage.remove();
+            }
+            // Add the final message only
+            if (trimmedFinal) {
+                addTranscriptMessage('user', `You: ${trimmedFinal}`, false);
             }
             currentUserMessage = '';
         }
