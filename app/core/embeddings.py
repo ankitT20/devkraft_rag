@@ -90,21 +90,18 @@ class GeminiEmbedding:
                 batch_embeddings = [emb.values for emb in result.embeddings]
                 all_embeddings.extend(batch_embeddings)
                 
-                # Rate limiting: wait 60 seconds before next batch to respect 49 req/min limit
-                # With API key rotation: only wait when the SAME key will be used again
+                # Rate limiting: wait 60 seconds to respect 49 req/min limit per key
+                # With API key rotation: wait after every 2 batches (after using key 2)
+                # This ensures each key has 60s between consecutive uses
                 # Without rotation: always wait between batches
                 if i + BATCH_SIZE < len(texts):  # Not the last batch
-                    next_batch_num = batch_num + 1
-                    # Check if next batch will use the same API key
                     if self.has_second_key:
-                        # With rotation: wait only if next batch uses the same key
-                        # Same key is used every 2 batches (1→3, 2→4, etc.)
-                        if next_batch_num % 2 == batch_num % 2:
+                        # With rotation: wait after every even batch (after using key 2)
+                        # This gives key 1 time to reset before being used again
+                        if batch_num % 2 == 0:
                             wait_time = 60
-                            app_logger.info(f"Rate limiting: waiting {wait_time} seconds before next batch (same API key)")
+                            app_logger.info(f"Rate limiting: waiting {wait_time} seconds before next batch")
                             time.sleep(wait_time)
-                        else:
-                            app_logger.info(f"Switching to alternate API key, no wait needed")
                     else:
                         # Without rotation: always wait
                         wait_time = 60
