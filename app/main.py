@@ -421,4 +421,12 @@ async def voice_interface():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Use PORT environment variable if available (for cloud platforms like Render)
+    # Otherwise default to 8000 for local development
+    port = int(os.getenv("PORT", 8000))
+
+    # Start FastAPI on the configured port
+    # The startup event handler will automatically start Streamlit
+    app_logger.info(f"Starting FastAPI on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
