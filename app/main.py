@@ -1,5 +1,30 @@
 """
 FastAPI application for RAG system.
+
+Render Deployment Options:
+
+Option 1 - Single Service (FastAPI + Streamlit):
+    Start Command: python -m app.main
+    Environment Variables:
+        - PORT: Set by Render automatically
+        - START_STREAMLIT: Set to "true" to auto-start Streamlit (default: true)
+    
+    This starts FastAPI on $PORT and Streamlit on internal port 8501.
+    Only FastAPI is externally accessible via Render's URL.
+    
+Option 2 - Two Separate Services (Recommended):
+    Service 1 (FastAPI):
+        Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+        Environment: START_STREAMLIT=false
+        
+    Service 2 (Streamlit):
+        Start Command: streamlit run streamlit_app.py --server.port $PORT --server.headless true
+        Environment: API_URL=<FastAPI_Service_URL>
+    
+For local development:
+    Run: python -m app.main
+    FastAPI: http://localhost:8000
+    Streamlit: http://localhost:8501
 """
 import os
 from pathlib import Path
@@ -61,7 +86,16 @@ async def startup_event():
     """
     Launch Streamlit in the background when FastAPI starts.
     This allows both services to run from a single Render deployment.
+    
+    Set START_STREAMLIT=false environment variable to disable auto-start.
     """
+    # Check if we should start Streamlit
+    should_start = os.getenv("START_STREAMLIT", "true").lower() == "true"
+    
+    if not should_start:
+        app_logger.info("Streamlit auto-start disabled (START_STREAMLIT=false)")
+        return
+    
     import subprocess
     import sys
     import threading
