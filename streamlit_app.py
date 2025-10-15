@@ -26,8 +26,9 @@ st.set_page_config(
 
 logger.info("Streamlit UI initialized")
 
-# API endpoint
-API_URL = "http://localhost:8000"
+# API endpoint - use environment variable for production, localhost for development
+import os
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 # Model configurations for display
 MODEL_INFO = {
@@ -226,8 +227,8 @@ def main():
         
         # Live Voice Call button
         st.markdown("### 🎤 Live Voice RAG")
-        st.markdown("""
-        <a href="http://localhost:8000/voice" target="_blank" style="
+        st.markdown(f"""
+        <a href="{API_URL}/voice" target="_blank" style="
             display: inline-block;
             padding: 0.5rem 1rem;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
