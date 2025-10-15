@@ -30,9 +30,9 @@ class GeminiEmbedding:
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for documents using RETRIEVAL_DOCUMENT task type.
-        Implements batching (max 90 per batch) and rate limiting to comply with API limits.
-        - Batch limit: 90 requests per batch (API max is 100, using 90 for safety)
-        - Rate limit: 90 requests per minute (API max is 100, using 90 for safety)
+        Implements batching (max 49 per batch) and rate limiting to comply with API limits.
+        - Batch limit: 49 requests per batch (Gemini API limit for safety)
+        - Rate limit: 49 requests per minute (60 second wait between batches)
         
         Args:
             texts: List of text strings to embed
@@ -48,8 +48,8 @@ class GeminiEmbedding:
                 error_logger.error("Cannot generate embeddings: texts list is empty")
                 raise ValueError("texts list cannot be empty")
             
-            # Batch processing: max 90 requests per batch
-            BATCH_SIZE = 90
+            # Batch processing: max 49 requests per batch (Gemini API limit)
+            BATCH_SIZE = 49
             all_embeddings = []
             
             for i in range(0, len(texts), BATCH_SIZE):
@@ -59,10 +59,7 @@ class GeminiEmbedding:
                 
                 app_logger.info(f"Processing batch {batch_num}/{total_batches} with {len(batch)} texts")
                 
-                # Apply rate limiting: 90 requests per minute
-                # After processing a batch, wait if needed to stay under rate limit
-                self.api_call_count += len(batch)
-                
+                # Make the API call
                 result = self.client.models.embed_content(
                     model=self.model,
                     contents=batch,
@@ -73,11 +70,11 @@ class GeminiEmbedding:
                 batch_embeddings = [emb.values for emb in result.embeddings]
                 all_embeddings.extend(batch_embeddings)
                 
-                # Rate limiting: wait ~0.7 seconds per request to stay under 90/min
-                # For a batch of 90, wait ~63 seconds before next batch
+                # Rate limiting: wait 60 seconds between batches to respect 49 req/min limit
+                # This ensures we never exceed the rate limit regardless of batch size
                 if i + BATCH_SIZE < len(texts):  # Not the last batch
-                    wait_time = len(batch) * 0.7  # ~0.7 sec per request = ~90 req/min
-                    app_logger.info(f"Rate limiting: waiting {wait_time:.1f} seconds before next batch")
+                    wait_time = 60
+                    app_logger.info(f"Rate limiting: waiting {wait_time} seconds before next batch")
                     time.sleep(wait_time)
             
             app_logger.info(f"Successfully generated {len(all_embeddings)} Gemini embeddings")
