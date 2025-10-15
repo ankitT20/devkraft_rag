@@ -200,6 +200,38 @@ async def ingest_all():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/ingest-website", response_model=IngestionResponse)
+async def ingest_website(request: dict):
+    """
+    Ingest content from a website URL.
+    
+    Args:
+        request: Dictionary with 'url' key containing the website URL
+        
+    Returns:
+        Ingestion result
+    """
+    try:
+        url = request.get("url")
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+        
+        app_logger.info(f"Received website ingestion request: {url}")
+        
+        # Ingest the website
+        success, message = ingestion_service.ingest_website(url)
+        
+        return IngestionResponse(
+            success=success,
+            message=message,
+            filename=url
+        )
+        
+    except Exception as e:
+        error_logger.error(f"Ingest website endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/chats", response_model=List[ChatHistoryItem])
 async def get_chats(limit: int = 10):
     """

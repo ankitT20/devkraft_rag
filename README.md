@@ -149,9 +149,11 @@ Choose between two models in the sidebar dropdown:
 ### Upload Documents
 
 1. Click "Upload Document" in sidebar
-2. Select a file (TXT, PDF, DOCX, or MD)
+2. Select a file (TXT, PDF, DOCX, MD, or CSV)
 3. Click "Upload" button
 4. Document will be processed and stored in vector databases
+
+You can also ingest website content using the `/ingest-website` API endpoint
 
 ### Chat
 
@@ -172,8 +174,9 @@ Choose between two models in the sidebar dropdown:
 - `GET /health` - Health status
 - `POST /query` - Process RAG query
 - `POST /query-stream` - Process RAG query with streaming response
-- `POST /upload` - Upload and ingest document
+- `POST /upload` - Upload and ingest document (supports TXT, PDF, DOCX, MD, CSV)
 - `POST /ingest-all` - Ingest all documents in folder
+- `POST /ingest-website` - Ingest content from a website URL
 - `GET /chats` - Get recent chat sessions
 - `GET /chat/{chat_id}` - Get full chat history
 - `POST /tts` - Convert text to speech
@@ -249,10 +252,15 @@ Logs are appended when the application is restarted multiple times on the same d
 
 ## Document Processing
 
-- **Chunking**: Semantic chunking with LangChain
-- **Chunk Size**: 2000 characters
-- **Overlap**: 400 characters
-- **Supported Formats**: TXT, PDF, DOCX, MD
+### Chunking Strategy
+- **Method**: RecursiveCharacterTextSplitter with LangChain
+- **Chunk Size**: 1500 characters
+- **Overlap**: 300 characters
+- **Note**: Semantic chunking is available but disabled by default to avoid consuming API quota
+
+### Supported Formats
+- **Documents**: TXT, PDF, DOCX, MD, CSV
+- **Web**: Websites via URL (using LangChain WebBaseLoader)
 
 ## Storage Strategy
 

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     
     # API Keys
     gemini_api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
+    gemini_api_key2: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY2", ""))
     qdrant_api_key: str = Field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
     hf_token: str = Field(default_factory=lambda: os.getenv("HF_TOKEN", ""))
     
