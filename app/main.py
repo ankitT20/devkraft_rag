@@ -55,6 +55,44 @@ if os.path.exists(static_dir):
 app_logger.info("FastAPI application initialized")
 
 
+# Startup event to launch Streamlit alongside FastAPI
+@app.on_event("startup")
+async def startup_event():
+    """
+    Launch Streamlit in the background when FastAPI starts.
+    This allows both services to run from a single Render deployment.
+    """
+    import subprocess
+    import sys
+    import threading
+    
+    def start_streamlit():
+        """Start Streamlit server in a separate thread."""
+        try:
+            # Get the port FastAPI is running on
+            port = int(os.getenv("PORT", 8000))
+            
+            # Start Streamlit on port 8501 internally
+            # Set API_URL environment variable so Streamlit knows where to find the API
+            env = os.environ.copy()
+            env["API_URL"] = f"http://localhost:{port}"
+            
+            subprocess.run(
+                [sys.executable, "-m", "streamlit", "run", "streamlit_app.py",
+                 "--server.port", "8501", "--server.headless", "true",
+                 "--server.address", "0.0.0.0"],
+                env=env,
+                check=False
+            )
+        except Exception as e:
+            app_logger.error(f"Error starting Streamlit: {e}")
+    
+    # Start Streamlit in a background thread
+    streamlit_thread = threading.Thread(target=start_streamlit, daemon=True)
+    streamlit_thread.start()
+    app_logger.info("Started Streamlit on internal port 8501 in background")
+
+
 @app.get("/", response_model=HealthResponse)
 async def root():
     """Root endpoint - health check."""
@@ -419,6 +457,17 @@ async def voice_interface():
         raise HTTPException(status_code=404, detail="Voice interface not found")
 
 
+
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
+    # Use PORT environment variable if available (for cloud platforms like Render)
+    # Otherwise default to 8000 for local development
+    port = int(os.getenv("PORT", 8000))
+    
+    # Start FastAPI on the configured port
+    # The startup event handler will automatically start Streamlit
+    app_logger.info(f"Starting FastAPI on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

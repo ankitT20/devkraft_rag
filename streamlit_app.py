@@ -26,8 +26,9 @@ st.set_page_config(
 
 logger.info("Streamlit UI initialized")
 
-# API endpoint
-API_URL = "http://localhost:8000"
+# API endpoint - use environment variable for production, localhost for development
+import os
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 # Model configurations for display
 MODEL_INFO = {
