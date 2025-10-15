@@ -1,30 +1,30 @@
 """
 FastAPI application for RAG system.
 
-Render Deployment Options:
-
-Option 1 - Single Service (FastAPI + Streamlit):
+Render Deployment - Single Service:
     Start Command: python -m app.main
     Environment Variables:
         - PORT: Set by Render automatically
         - START_STREAMLIT: Set to "true" to auto-start Streamlit (default: true)
     
-    This starts FastAPI on $PORT and Streamlit on internal port 8501.
-    Only FastAPI is externally accessible via Render's URL.
+    This deployment:
+    - Starts FastAPI on $PORT (main process)
+    - Auto-starts Streamlit on internal port 8501 (subprocess)
+    - Root URL (/) redirects to Streamlit UI at /app
+    - API endpoints remain accessible at /query, /upload, /health, etc.
+    - Streamlit is proxied through FastAPI at /app route
     
-Option 2 - Two Separate Services (Recommended):
-    Service 1 (FastAPI):
-        Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-        Environment: START_STREAMLIT=false
-        
-    Service 2 (Streamlit):
-        Start Command: streamlit run streamlit_app.py --server.port $PORT --server.headless true
-        Environment: API_URL=<FastAPI_Service_URL>
+    Access:
+    - Visit https://your-app.onrender.com/ -> Redirects to Streamlit
+    - Streamlit UI: https://your-app.onrender.com/app
+    - API endpoints: https://your-app.onrender.com/query, /health, etc.
+    - Voice interface: https://your-app.onrender.com/voice
     
 For local development:
     Run: python -m app.main
-    FastAPI: http://localhost:8000
-    Streamlit: http://localhost:8501
+    - FastAPI: http://localhost:8000
+    - Streamlit: http://localhost:8501
+    - Root redirects to /app which proxies to Streamlit
 """
 import os
 from pathlib import Path
@@ -47,8 +47,10 @@ from app.services.ingestion import IngestionService
 from app.core.tts import TTSService
 from app.core.live_api import live_api_service
 from app.utils.logging_config import app_logger, error_logger
-from fastapi.responses import Response, StreamingResponse, FileResponse
+from fastapi.responses import Response, StreamingResponse, FileResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.requests import Request
+import httpx
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -127,13 +129,10 @@ async def startup_event():
     app_logger.info("Started Streamlit on internal port 8501 in background")
 
 
-@app.get("/", response_model=HealthResponse)
+@app.get("/")
 async def root():
-    """Root endpoint - health check."""
-    return HealthResponse(
-        status="ok",
-        message="DevKraft RAG API is running"
-    )
+    """Root endpoint - redirects to Streamlit UI."""
+    return RedirectResponse(url="/app")
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -474,6 +473,124 @@ async def search_knowledge_base(request: dict):
     except Exception as e:
         error_logger.error(f"Search knowledge base endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _reverse_proxy_handler(request: Request, path: str):
+    """
+    Internal handler to proxy requests to Streamlit.
+    Handles both HTTP requests and WebSocket connections.
+    """
+    client = httpx.AsyncClient(base_url="http://localhost:8501", timeout=30.0)
+    url = httpx.URL(path=path, query=request.url.query.encode("utf-8"))
+    
+    # Prepare headers, excluding host-related headers
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    
+    try:
+        # Forward the request to Streamlit
+        proxy_request = client.build_request(
+            method=request.method,
+            url=url,
+            headers=headers,
+            content=await request.body(),
+        )
+        proxy_response = await client.send(proxy_request, stream=True)
+        
+        # Prepare response headers
+        response_headers = dict(proxy_response.headers)
+        response_headers.pop("content-encoding", None)
+        response_headers.pop("content-length", None)
+        response_headers.pop("transfer-encoding", None)
+        
+        # Stream the response back
+        async def stream_response():
+            try:
+                async for chunk in proxy_response.aiter_bytes():
+                    yield chunk
+            finally:
+                await proxy_response.aclose()
+                await client.aclose()
+        
+        return StreamingResponse(
+            stream_response(),
+            status_code=proxy_response.status_code,
+            headers=response_headers,
+            media_type=proxy_response.headers.get("content-type"),
+        )
+    except httpx.ConnectError:
+        await client.aclose()
+        app_logger.error("Cannot connect to Streamlit on port 8501")
+        return HTMLResponse(
+            content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>DevKraft RAG - Loading</title>
+                <meta http-equiv="refresh" content="3">
+                <style>
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                    }
+                    .container {
+                        text-align: center;
+                    }
+                    .spinner {
+                        border: 4px solid rgba(255, 255, 255, 0.3);
+                        border-radius: 50%;
+                        border-top: 4px solid white;
+                        width: 40px;
+                        height: 40px;
+                        animation: spin 1s linear infinite;
+                        margin: 20px auto;
+                    }
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🤖 DevKraft RAG</h1>
+                    <div class="spinner"></div>
+                    <p>Streamlit is starting up...</p>
+                    <p><small>This page will auto-refresh in a moment.</small></p>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=503
+        )
+    except Exception as e:
+        await client.aclose()
+        app_logger.error(f"Error proxying to Streamlit: {e}")
+        raise HTTPException(status_code=502, detail=f"Error connecting to Streamlit: {str(e)}")
+
+
+@app.api_route("/app/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+async def streamlit_proxy_with_path(request: Request, path: str):
+    """
+    Proxy all requests to Streamlit with path.
+    This makes Streamlit accessible through the main FastAPI service.
+    """
+    return await _reverse_proxy_handler(request, f"/{path}")
+
+
+@app.api_route("/app", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+async def streamlit_proxy_root(request: Request):
+    """
+    Proxy root /app requests to Streamlit.
+    This makes Streamlit accessible through the main FastAPI service.
+    """
+    return await _reverse_proxy_handler(request, "/")
 
 
 @app.get("/voice")
