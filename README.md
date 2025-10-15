@@ -139,6 +139,43 @@ streamlit run streamlit_app.py
 - **API Documentation**: http://localhost:8000/docs
 - **Live Voice RAG**: http://localhost:8000/voice (Native audio interface)
 
+## Deploying to Render
+
+### Option 1: Single Service (FastAPI + Auto-start Streamlit)
+
+This option runs both services from one Render web service, but only FastAPI is externally accessible.
+
+**Start Command:**
+```bash
+python -m app.main
+```
+
+**Environment Variables:**
+- `PORT`: Set automatically by Render
+- `START_STREAMLIT`: Set to `true` (default) to auto-start Streamlit
+- Other API keys (GEMINI_API_KEY, QDRANT_API_KEY, etc.)
+
+**Note:** With this option, only the FastAPI backend will be accessible via your Render URL. Streamlit runs internally on port 8501 but is not externally accessible.
+
+### Option 2: Two Separate Services (Recommended)
+
+Deploy FastAPI and Streamlit as two separate Render web services.
+
+**Service 1 - FastAPI Backend:**
+- **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables:**
+  - `PORT`: Set by Render
+  - `START_STREAMLIT`: Set to `false` to disable auto-start
+  - API keys (GEMINI_API_KEY, QDRANT_API_KEY, etc.)
+
+**Service 2 - Streamlit Frontend:**
+- **Start Command:** `streamlit run streamlit_app.py --server.port $PORT --server.headless true --server.address 0.0.0.0`
+- **Environment Variables:**
+  - `PORT`: Set by Render
+  - `API_URL`: Set to your FastAPI service URL (e.g., `https://your-api.onrender.com`)
+
+This option allows both services to be accessible: FastAPI at its URL and Streamlit at its URL.
+
 ## Usage
 
 ### Model Selection
