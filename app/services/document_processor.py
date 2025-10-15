@@ -93,6 +93,10 @@ class DocumentProcessor:
         Returns:
             Cleaned text
         """
+        # Check for None or empty input
+        if not text:
+            return ""
+        
         # Remove excessive whitespace
         text = re.sub(r'\s+', ' ', text)
         
@@ -141,9 +145,20 @@ class DocumentProcessor:
             # Load documents
             documents = loader.load()
             
+            # Check if documents were loaded
+            if not documents:
+                error_logger.error(f"No documents loaded from {file_path}")
+                raise ValueError(f"Failed to load any content from {file_path}")
+            
             # Preprocess documents to clean noise and formatting
             for doc in documents:
                 doc.page_content = self._preprocess_text(doc.page_content)
+            
+            # Check if all content was stripped during preprocessing
+            total_content = "".join([doc.page_content for doc in documents])
+            if not total_content or len(total_content.strip()) == 0:
+                error_logger.error(f"Document {file_path} has no processable text content after preprocessing")
+                raise ValueError(f"Document contains no processable text content")
             
             # For PDFs, preserve page information
             if file_ext == ".pdf":
