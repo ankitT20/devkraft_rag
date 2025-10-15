@@ -16,8 +16,9 @@ endheader
 
 ' Entry Points
 package "🚀 Entry Points" #E8F5E9 {
-  component [streamlit_app.py\n<i>Streamlit UI</i>] as UI #C8E6C9
-  component [app/main.py\n<i>FastAPI Backend</i>] as API #C8E6C9
+  component [streamlit_app.py\n<i>Streamlit UI (Port 8501)</i>] as UI #C8E6C9
+  component [app/main.py\n<i>FastAPI Backend (Port 8000)</i>] as API #C8E6C9
+  component [static/voice.html\n<i>Live Voice Interface</i>] as VoiceUI #C8E6C9
   component [start.sh\n<i>Startup Script</i>] as Script #C8E6C9
 }
 
@@ -36,6 +37,7 @@ package "🔧 Core Services" #E3F2FD {
   component [LocalLLM\n<i>qwen3-1.7b</i>] as LocalLLM #90CAF9
   component [ChatStorageService\n<i>Chat History</i>] as ChatStorage #90CAF9
   component [TTSService\n<i>Text-to-Speech</i>] as TTS #90CAF9
+  component [LiveAPIService\n<i>Ephemeral Tokens</i>] as LiveAPI #90CAF9
 }
 
 ' Business Services
@@ -76,8 +78,9 @@ folder "📁 Runtime Folders" #E0E0E0 {
 
 ' Entry Points
 UI --> API : HTTP Requests
-Script --> API : Starts Server
-Script --> UI : Starts Interface
+VoiceUI --> API : Live API Endpoints
+Script --> API : Starts Server (Port 8000)
+Script --> UI : Starts Interface (Port 8501)
 
 ' Configuration
 Config --> EnvFile : Loads Variables
@@ -88,6 +91,8 @@ API --> RAG : Query Processing
 API --> Ingestion : Document Upload
 API --> TTS : Audio Generation
 API --> ChatStorage : History Management
+API --> LiveAPI : Token Generation
+VoiceUI --> LiveAPI : Ephemeral Tokens
 
 ' RAG Service Flow
 RAG --> GeminiEmbed : Generate Embeddings
@@ -107,6 +112,7 @@ Ingestion --> Storage : Store Embeddings
 GeminiEmbed --> GeminiAPI : API Calls
 GeminiLLM --> GeminiAPI : API Calls
 TTS --> GeminiAPI : TTS API
+LiveAPI --> GeminiAPI : Token Generation\n(v1alpha)
 LocalEmbed --> LMStudio : HTTP Requests
 LocalEmbed --> HF : Fallback API
 LocalLLM --> LMStudio : HTTP Requests
@@ -131,6 +137,7 @@ LocalLLM --> Logging : Log Generation
 Storage --> Logging : Log Operations
 ChatStorage --> Logging : Log Storage
 TTS --> Logging : Log TTS
+LiveAPI --> Logging : Log Token Generation
 Logging --> Logs : Write Files
 
 ' Runtime Folders
@@ -156,9 +163,14 @@ legend right
   <b>Key Features:</b>
   ✓ Dual storage (MongoDB + JSON fallback)
   ✓ Vector search with Qdrant
-  ✓ PDF/TXT/DOCX support
+  ✓ PDF/TXT/DOCX/CSV/Website support
   ✓ Streaming responses
   ✓ Text-to-speech
+  ✓ Live Voice RAG with native audio
+  
+  <b>Ports:</b>
+  • FastAPI Backend: 8000
+  • Streamlit UI: 8501
 endlegend
 
 footer

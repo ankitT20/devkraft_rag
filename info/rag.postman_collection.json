@@ -1,364 +1,481 @@
 {
-	"info": {
-		"_postman_id": "devkraft-rag-api-collection",
-		"name": "DevKraft RAG API",
-		"description": "Complete collection for DevKraft RAG API endpoints with Gemini and Local LLM support",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "devkraft-rag"
-	},
-	"item": [
-		{
-			"name": "Health Check",
-			"item": [
-				{
-					"name": "Root Health Check",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								""
-							]
-						},
-						"description": "Root endpoint health check to verify the API is running"
-					},
-					"response": []
-				},
-				{
-					"name": "Health Status",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/health",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"health"
-							]
-						},
-						"description": "Detailed health check endpoint to verify all services are operational"
-					},
-					"response": []
-				}
-			],
-			"description": "Health check endpoints to verify API status"
-		},
-		{
-			"name": "Query",
-			"item": [
-				{
-					"name": "RAG Query (Gemini)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"query\": \"What is DevKraft RAG?\",\n    \"model_type\": \"gemini\",\n    \"chat_id\": null\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/query",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"query"
-							]
-						},
-						"description": "Process a RAG query using Gemini model (cloud-based with Gemini API and Qdrant Cloud)"
-					},
-					"response": []
-				},
-				{
-					"name": "RAG Query (Qwen3 Local)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"query\": \"Explain the architecture of this system\",\n    \"model_type\": \"qwen3\",\n    \"chat_id\": null\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/query",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"query"
-							]
-						},
-						"description": "Process a RAG query using Qwen3 local model (LMStudio + Docker Qdrant)"
-					},
-					"response": []
-				},
-				{
-					"name": "RAG Query with Chat ID",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"query\": \"What did we discuss earlier?\",\n    \"model_type\": \"gemini\",\n    \"chat_id\": \"chat_12345\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/query",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"query"
-							]
-						},
-						"description": "Continue an existing chat session by providing a chat_id"
-					},
-					"response": []
-				},
-				{
-					"name": "RAG Query Stream (Gemini)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"query\": \"Tell me about the features of this RAG system\",\n    \"model_type\": \"gemini\",\n    \"chat_id\": null\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/query-stream",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"query-stream"
-							]
-						},
-						"description": "Process a RAG query with streaming response using Server-Sent Events (SSE)"
-					},
-					"response": []
-				},
-				{
-					"name": "RAG Query Stream (Qwen3 Local)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"query\": \"Describe the document processing workflow\",\n    \"model_type\": \"qwen3\",\n    \"chat_id\": null\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/query-stream",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"query-stream"
-							]
-						},
-						"description": "Process a RAG query with streaming response using Qwen3 local model"
-					},
-					"response": []
-				}
-			],
-			"description": "RAG query endpoints for processing user queries with both regular and streaming responses"
-		},
-		{
-			"name": "Document Management",
-			"item": [
-				{
-					"name": "Upload Document",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "file",
-									"type": "file",
-									"src": [],
-									"description": "Select a PDF, TXT, or DOCX file to upload and ingest"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/upload",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"upload"
-							]
-						},
-						"description": "Upload a document file (PDF, TXT, DOCX) to be ingested into the RAG system"
-					},
-					"response": []
-				},
-				{
-					"name": "Ingest All Documents",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/ingest-all",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"ingest-all"
-							]
-						},
-						"description": "Ingest all documents from the generate_embeddings folder into the vector database"
-					},
-					"response": []
-				}
-			],
-			"description": "Document upload and ingestion endpoints"
-		},
-		{
-			"name": "Chat History",
-			"item": [
-				{
-					"name": "Get Recent Chats",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/chats?limit=10",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"chats"
-							],
-							"query": [
-								{
-									"key": "limit",
-									"value": "10",
-									"description": "Maximum number of chat sessions to return"
-								}
-							]
-						},
-						"description": "Get a list of recent chat sessions with metadata"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Chat by ID",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/chat/:chat_id",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"chat",
-								":chat_id"
-							],
-							"variable": [
-								{
-									"key": "chat_id",
-									"value": "chat_12345",
-									"description": "The unique chat session ID"
-								}
-							]
-						},
-						"description": "Get the complete chat history for a specific chat session ID"
-					},
-					"response": []
-				}
-			],
-			"description": "Chat history management endpoints"
-		},
-		{
-			"name": "Text to Speech",
-			"item": [
-				{
-					"name": "Convert Text to Speech",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"text\": \"Hello! This is a text to speech conversion test using Gemini TTS model.\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/tts",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"tts"
-							]
-						},
-						"description": "Convert text to speech audio (WAV format) using Gemini TTS model"
-					},
-					"response": []
-				}
-			],
-			"description": "Text-to-speech conversion endpoint"
-		}
-	],
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		}
-	],
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:8000",
-			"type": "string"
-		}
-	]
+  "info": {
+    "_postman_id": "devkraft-rag-api-collection",
+    "name": "DevKraft RAG API",
+    "description": "Complete collection for DevKraft RAG API endpoints with Gemini and Local LLM support",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "devkraft-rag"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Root Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Root endpoint health check to verify the API is running"
+          },
+          "response": []
+        },
+        {
+          "name": "Health Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Detailed health check endpoint to verify all services are operational"
+          },
+          "response": []
+        }
+      ],
+      "description": "Health check endpoints to verify API status"
+    },
+    {
+      "name": "Query",
+      "item": [
+        {
+          "name": "RAG Query (Gemini)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"query\": \"What is DevKraft RAG?\",\n    \"model_type\": \"gemini\",\n    \"chat_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "query"
+              ]
+            },
+            "description": "Process a RAG query using Gemini model (cloud-based with Gemini API and Qdrant Cloud)"
+          },
+          "response": []
+        },
+        {
+          "name": "RAG Query (Qwen3 Local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"query\": \"Explain the architecture of this system\",\n    \"model_type\": \"qwen3\",\n    \"chat_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "query"
+              ]
+            },
+            "description": "Process a RAG query using Qwen3 local model (LMStudio + Docker Qdrant)"
+          },
+          "response": []
+        },
+        {
+          "name": "RAG Query with Chat ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"query\": \"What did we discuss earlier?\",\n    \"model_type\": \"gemini\",\n    \"chat_id\": \"chat_12345\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "query"
+              ]
+            },
+            "description": "Continue an existing chat session by providing a chat_id"
+          },
+          "response": []
+        },
+        {
+          "name": "RAG Query Stream (Gemini)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"query\": \"Tell me about the features of this RAG system\",\n    \"model_type\": \"gemini\",\n    \"chat_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query-stream",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "query-stream"
+              ]
+            },
+            "description": "Process a RAG query with streaming response using Server-Sent Events (SSE)"
+          },
+          "response": []
+        },
+        {
+          "name": "RAG Query Stream (Qwen3 Local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"query\": \"Describe the document processing workflow\",\n    \"model_type\": \"qwen3\",\n    \"chat_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/query-stream",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "query-stream"
+              ]
+            },
+            "description": "Process a RAG query with streaming response using Qwen3 local model"
+          },
+          "response": []
+        }
+      ],
+      "description": "RAG query endpoints for processing user queries with both regular and streaming responses"
+    },
+    {
+      "name": "Document Management",
+      "item": [
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a PDF, TXT, or DOCX file to upload and ingest"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/upload",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "upload"
+              ]
+            },
+            "description": "Upload a document file (PDF, TXT, DOCX) to be ingested into the RAG system"
+          },
+          "response": []
+        },
+        {
+          "name": "Ingest All Documents",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ingest-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest-all"
+              ]
+            },
+            "description": "Ingest all documents from the generate_embeddings folder into the vector database"
+          },
+          "response": []
+        },
+        {
+          "name": "Ingest Website Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/page\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest-website",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest-website"
+              ]
+            },
+            "description": "Ingest content from a website URL. Extracts text from the webpage, chunks it, generates embeddings, and stores in vector databases."
+          },
+          "response": []
+        }
+      ],
+      "description": "Document upload and ingestion endpoints"
+    },
+    {
+      "name": "Chat History",
+      "item": [
+        {
+          "name": "Get Recent Chats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/chats?limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "chats"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Maximum number of chat sessions to return"
+                }
+              ]
+            },
+            "description": "Get a list of recent chat sessions with metadata"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/chat/:chat_id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "chat",
+                ":chat_id"
+              ],
+              "variable": [
+                {
+                  "key": "chat_id",
+                  "value": "chat_12345",
+                  "description": "The unique chat session ID"
+                }
+              ]
+            },
+            "description": "Get the complete chat history for a specific chat session ID"
+          },
+          "response": []
+        }
+      ],
+      "description": "Chat history management endpoints"
+    },
+    {
+      "name": "Text to Speech",
+      "item": [
+        {
+          "name": "Convert Text to Speech",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"text\": \"Hello! This is a text to speech conversion test using Gemini TTS model.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tts"
+              ]
+            },
+            "description": "Convert text to speech audio (WAV format) using Gemini TTS model"
+          },
+          "response": []
+        }
+      ],
+      "description": "Text-to-speech conversion endpoint"
+    },
+    {
+      "name": "Live API (Voice Interface)",
+      "item": [
+        {
+          "name": "Get Voice Interface",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/voice",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "voice"
+              ]
+            },
+            "description": "Access the Live Voice RAG interface HTML page. Opens in browser for real-time voice interaction with the AI using Gemini Live API."
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Ephemeral Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/generate-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "generate-token"
+              ]
+            },
+            "description": "Generate an ephemeral token for client-side Live API access. Token expires in 30 minutes and is single-use for security."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Function Declarations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/function-declarations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "function-declarations"
+              ]
+            },
+            "description": "Get RAG function declarations for Live API. Returns function definitions that the Live API can call to search the knowledge base."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Knowledge Base",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What is DevKraft RAG?\",\n  \"top_k\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/search-knowledge-base",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "search-knowledge-base"
+              ]
+            },
+            "description": "Search the knowledge base for relevant information. This endpoint is called by the Live API as a tool function during voice conversations to retrieve context from the vector database."
+          },
+          "response": []
+        }
+      ],
+      "description": "Live API endpoints for real-time voice interaction with Gemini Live API. Includes token generation, function declarations, and RAG search integration."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ]
 }
