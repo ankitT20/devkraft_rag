@@ -153,8 +153,8 @@ class IngestionService:
                 msg = "success: ingested to both cloud and docker"
             elif cloud_success:
                 msg = "partial success: ingested to cloud only"
-                if docker_error:
-                    msg += f" (docker failed: {docker_error[:100]})"
+                # if docker_error:
+                #     msg += f" (docker failed: {docker_error[:100]})"
             elif docker_success:
                 msg = "partial success: ingested to docker only"
                 if cloud_error:
