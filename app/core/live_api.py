@@ -16,13 +16,30 @@ class LiveAPIService:
     """
     
     def __init__(self):
-        """Initialize Live API service."""
+        """Initialize Live API service with API key rotation support."""
         self.client = genai.Client(
             api_key=settings.gemini_api_key,
             http_options={'api_version': 'v1alpha'}
         )
         self.model = settings.gemini_live_model
-        app_logger.info(f"Initialized LiveAPIService with model: {self.model}")
+        self.token_call_count = 0  # Track token generation calls for API key rotation
+        
+        # Initialize second client if second API key is available
+        self.client2 = None
+        self.has_second_key = False
+        if settings.gemini_api_key2:
+            try:
+                self.client2 = genai.Client(
+                    api_key=settings.gemini_api_key2,
+                    http_options={'api_version': 'v1alpha'}
+                )
+                self.has_second_key = True
+                app_logger.info(f"Initialized LiveAPIService with model: {self.model} (with API key rotation)")
+            except Exception as e:
+                error_logger.warning(f"Failed to initialize second Live API client: {e}")
+                app_logger.info(f"Initialized LiveAPIService with model: {self.model} (single API key)")
+        else:
+            app_logger.info(f"Initialized LiveAPIService with model: {self.model} (single API key)")
     
     def generate_ephemeral_token(self) -> Dict[str, Any]:
         """
@@ -34,8 +51,19 @@ class LiveAPIService:
         try:
             now = datetime.datetime.now(tz=datetime.timezone.utc)
             
+            # Increment call counter for API key rotation
+            self.token_call_count += 1
+            
+            # Alternate between API keys for token generation
+            if self.has_second_key and self.token_call_count % 2 == 0:
+                current_client = self.client2
+                app_logger.info(f"Generating ephemeral token (call #{self.token_call_count}, using API key 2)")
+            else:
+                current_client = self.client
+                app_logger.info(f"Generating ephemeral token (call #{self.token_call_count}, using API key 1)")
+            
             # Create token with 30 min expiry and 1 min to start new session
-            token = self.client.auth_tokens.create(
+            token = current_client.auth_tokens.create(
                 config={
                     'uses': 1,  # Single use token for security
                     'expire_time': now + datetime.timedelta(minutes=30),
