@@ -21,11 +21,24 @@ class GeminiEmbedding:
     """
     
     def __init__(self):
-        """Initialize Gemini client."""
+        """Initialize Gemini client with API key rotation support."""
         self.client = genai.Client(api_key=settings.gemini_api_key)
         self.model = settings.gemini_embedding_model
         self.api_call_count = 0  # Track API calls for rate limiting
-        app_logger.info(f"Initialized GeminiEmbedding with model: {self.model}")
+        
+        # Initialize second client if second API key is available
+        self.client2 = None
+        self.has_second_key = False
+        if settings.gemini_api_key2:
+            try:
+                self.client2 = genai.Client(api_key=settings.gemini_api_key2)
+                self.has_second_key = True
+                app_logger.info(f"Initialized GeminiEmbedding with model: {self.model} (with API key rotation)")
+            except Exception as e:
+                error_logger.warning(f"Failed to initialize second Gemini client: {e}")
+                app_logger.info(f"Initialized GeminiEmbedding with model: {self.model} (single API key)")
+        else:
+            app_logger.info(f"Initialized GeminiEmbedding with model: {self.model} (single API key)")
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
@@ -57,10 +70,17 @@ class GeminiEmbedding:
                 batch_num = (i // BATCH_SIZE) + 1
                 total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
                 
-                app_logger.info(f"Processing batch {batch_num}/{total_batches} with {len(batch)} texts")
+                # Select client for API key rotation: alternate between keys for each batch
+                # Odd batches (1, 3, 5...) use client1, even batches (2, 4, 6...) use client2
+                if self.has_second_key and batch_num % 2 == 0:
+                    current_client = self.client2
+                    app_logger.info(f"Processing batch {batch_num}/{total_batches} with {len(batch)} texts (using API key 2)")
+                else:
+                    current_client = self.client
+                    app_logger.info(f"Processing batch {batch_num}/{total_batches} with {len(batch)} texts (using API key 1)")
                 
                 # Make the API call
-                result = self.client.models.embed_content(
+                result = current_client.models.embed_content(
                     model=self.model,
                     contents=batch,
                     config=types.EmbedContentConfig(
@@ -103,7 +123,13 @@ class GeminiEmbedding:
                 app_logger.info(f"Rate limiting: Applied 10 second delay after {self.api_call_count} API calls")
                 time.sleep(10)
             
-            result = self.client.models.embed_content(
+            # Alternate between API keys for query embeddings
+            if self.has_second_key and self.api_call_count % 2 == 0:
+                current_client = self.client2
+            else:
+                current_client = self.client
+            
+            result = current_client.models.embed_content(
                 model=self.model,
                 contents=text,
                 config=types.EmbedContentConfig(
