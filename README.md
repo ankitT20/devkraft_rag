@@ -26,7 +26,9 @@ devkraft_rag/
 │   │   ├── embeddings.py  # Embedding services (Gemini, Local/HF)
 │   │   ├── llm.py         # LLM services (Gemini, Local/HF)
 │   │   ├── storage.py     # Qdrant vector storage
-│   │   └── chat_storage.py # MongoDB chat history storage
+│   │   ├── chat_storage.py # MongoDB chat history storage
+│   │   ├── tts.py         # Text-to-speech service
+│   │   └── live_api.py    # Live API ephemeral token service
 │   ├── services/          # Business logic
 │   │   ├── document_processor.py  # Document loading and chunking
 │   │   ├── ingestion.py   # Document ingestion pipeline
@@ -41,7 +43,13 @@ devkraft_rag/
 │   ├── rag.postman_collection.json  # Postman API collection
 │   ├── rag.postman_environment.json # Postman environment file
 │   ├── .env.example       # Environment variable template
-│   └── architecture-simple.puml     # System architecture diagram
+│   ├── architecture-simple.puml     # System architecture diagram
+│   └── DevKraft_RAG_Architecture.png # Architecture diagram image
+├── static/                # Live Voice RAG frontend
+│   ├── voice.html         # Voice interface page
+│   ├── voice.js           # JavaScript client using @google/genai SDK
+│   ├── voice.css          # Voice interface styling
+│   └── package.json       # Optional: NPM config for local SDK installation
 ├── streamlit_app.py       # Streamlit UI
 ├── generate_embeddings/   # Document upload folder
 ├── user_chat/             # Chat history storage
@@ -126,9 +134,10 @@ streamlit run streamlit_app.py
 
 ### Access Points
 
-- **Streamlit UI**: http://localhost:8501
-- **FastAPI Backend**: http://localhost:8000
+- **Streamlit UI**: http://localhost:8501 (Port: 8501)
+- **FastAPI Backend**: http://localhost:8000 (Port: 8000)
 - **API Documentation**: http://localhost:8000/docs
+- **Live Voice RAG**: http://localhost:8000/voice (Native audio interface)
 
 ## Usage
 
@@ -168,7 +177,32 @@ You can also ingest website content using the `/ingest-website` API endpoint
 - Click a chat to load it
 - Click "New Chat" to start fresh
 
+### Live Voice RAG
+
+Access the Live Voice RAG interface at http://localhost:8000/voice for real-time voice interaction:
+
+1. **Click "Start Conversation"** to begin
+2. **Speak naturally** into your microphone
+3. **AI responds with voice** in real-time
+4. **RAG Integration**: The AI can search your knowledge base during conversation
+5. **View transcript** to see the conversation flow
+
+**Technical Details:**
+- Uses Gemini 2.5 Flash Native Audio model for low-latency audio
+- Ephemeral token authentication (30-minute expiry, single-use tokens)
+- Client-to-Gemini direct connection (no backend audio proxy)
+- Automatic Voice Activity Detection (VAD) for interruption handling
+- Function calling for RAG knowledge base search
+
+**Frontend Implementation:**
+- JavaScript SDK (`@google/genai`) loaded from CDN by default
+- Optional local installation available (see `static/package.json`)
+- Pure ES6 modules, no build step required
+- Real-time audio streaming with Web Audio API
+
 ## API Endpoints
+
+### Standard API Endpoints
 
 - `GET /` - Health check
 - `GET /health` - Health status
@@ -180,6 +214,13 @@ You can also ingest website content using the `/ingest-website` API endpoint
 - `GET /chats` - Get recent chat sessions
 - `GET /chat/{chat_id}` - Get full chat history
 - `POST /tts` - Convert text to speech
+
+### Live API Endpoints (Voice Interface)
+
+- `GET /voice` - Access Live Voice RAG interface
+- `GET /api/generate-token` - Generate ephemeral token for client-side Live API access
+- `GET /api/function-declarations` - Get RAG function declarations for Live API
+- `POST /api/search-knowledge-base` - Search knowledge base (called by Live API as tool function)
 
 Visit http://localhost:8000/docs for interactive API documentation.
 
