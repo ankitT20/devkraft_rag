@@ -72,6 +72,11 @@ async def health():
         message="All services are operational"
     )
 
+@app.head("/health")
+async def health_head():
+    """HEAD request handler for uptime monitors."""
+    return Response(status_code=200)
+
 
 @app.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
