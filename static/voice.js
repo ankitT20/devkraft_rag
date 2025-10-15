@@ -20,7 +20,7 @@
 import { GoogleGenAI, Modality } from 'https://esm.run/@google/genai';
 
 // Configuration
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://bootcamp-rag-cxi4.onrender.com';
 const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 // Debug flag
